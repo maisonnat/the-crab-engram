@@ -1,0 +1,687 @@
+openapi: "3.0.3"
+info:
+  title: Engram-Rust HTTP API
+  description: Persistent memory for AI coding agents — REST API
+  version: "2.0.0"
+  license:
+    name: MIT
+    url: https://github.com/Gentleman-Programming/engram-rust
+
+servers:
+  - url: http://localhost:7437
+    description: Default local server
+
+paths:
+  /observations:
+    get:
+      summary: Search observations
+      operationId: searchObservations
+      tags: [Observations]
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [bugfix, decision, architecture, pattern, discovery, learning, config, convention, tool_use, file_change, command, file_read, search, manual]
+        - name: project
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Observation"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+    post:
+      summary: Create observation
+      operationId: createObservation
+      tags: [Observations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateObservationRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /observations/{id}:
+    get:
+      summary: Get observation by ID
+      operationId: getObservation
+      tags: [Observations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Observation"
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+    put:
+      summary: Update observation (partial)
+      operationId: updateObservation
+      tags: [Observations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateObservationRequest"
+      responses:
+        "204":
+          description: Updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+    delete:
+      summary: Soft-delete observation
+      operationId: deleteObservation
+      tags: [Observations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /search:
+    post:
+      summary: Search (POST variant)
+      operationId: search
+      tags: [Search]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchQuery"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Observation"
+
+  /stats:
+    get:
+      summary: Project statistics
+      operationId: getStats
+      tags: [Stats]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectStats"
+
+  /sessions:
+    post:
+      summary: Create session
+      operationId: createSession
+      tags: [Sessions]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+
+  /sessions/{id}:
+    get:
+      summary: Get session by ID
+      operationId: getSession
+      tags: [Sessions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /context:
+    get:
+      summary: Get session context
+      operationId: getContext
+      tags: [Context]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionContext"
+
+  /export:
+    get:
+      summary: Export project data
+      operationId: exportData
+      tags: [Data]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportData"
+
+  /import:
+    post:
+      summary: Import data
+      operationId: importData
+      tags: [Data]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportData"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /capsules:
+    get:
+      summary: List knowledge capsules
+      operationId: listCapsules
+      tags: [Knowledge]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeCapsule"
+
+  /capsules/{topic}:
+    get:
+      summary: Get capsule by topic
+      operationId: getCapsule
+      tags: [Knowledge]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeCapsule"
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /consolidate:
+    post:
+      summary: Run memory consolidation
+      operationId: consolidate
+      tags: [Knowledge]
+      responses:
+        "200":
+          description: Consolidation results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  time_taken_ms:
+                    type: integer
+                  duplicates_merged:
+                    type: integer
+                  obsolete_marked:
+                    type: integer
+                  conflicts_found:
+                    type: integer
+                  patterns_extracted:
+                    type: integer
+
+  /graph/{id}:
+    get:
+      summary: Get edges for observation
+      operationId: getGraphEdges
+      tags: [Knowledge]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Edge"
+
+  /inject:
+    post:
+      summary: Smart context injection
+      operationId: inject
+      tags: [Knowledge]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task]
+              properties:
+                task:
+                  type: string
+                max_tokens:
+                  type: integer
+                  default: 2000
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  relevant_memories:
+                    type: integer
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                  knowledge_boundaries:
+                    type: array
+                    items:
+                      type: string
+                  total_tokens:
+                    type: integer
+                  markdown:
+                    type: string
+
+  /antipatterns:
+    get:
+      summary: Detect anti-patterns
+      operationId: getAntipatterns
+      tags: [Knowledge]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AntiPattern"
+
+components:
+  schemas:
+    Observation:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [bugfix, decision, architecture, pattern, discovery, learning, config, convention, tool_use, file_change, command, file_read, search, manual]
+        scope:
+          type: string
+          enum: [project, personal]
+        title:
+          type: string
+        content:
+          type: string
+        session_id:
+          type: string
+        project:
+          type: string
+        topic_key:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        access_count:
+          type: integer
+        last_accessed:
+          type: string
+          format: date-time
+          nullable: true
+        pinned:
+          type: boolean
+        normalized_hash:
+          type: string
+        provenance_source:
+          type: string
+          enum: [test_verified, code_analysis, user_stated, external, llm_reasoning, inferred]
+        provenance_confidence:
+          type: number
+          format: double
+        lifecycle_state:
+          type: string
+          enum: [active, stale, archived, deleted]
+        emotional_valence:
+          type: number
+        surprise_factor:
+          type: number
+        effort_invested:
+          type: number
+
+    CreateObservationRequest:
+      type: object
+      required: [title, content, session_id]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        type:
+          type: string
+          default: manual
+        scope:
+          type: string
+          default: project
+        session_id:
+          type: string
+        project:
+          type: string
+        topic_key:
+          type: string
+
+    UpdateObservationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        pinned:
+          type: boolean
+        topic_key:
+          type: string
+
+    SearchQuery:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+        type:
+          type: string
+        project:
+          type: string
+        limit:
+          type: integer
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        project:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+
+    SessionContext:
+      type: object
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Observation"
+        prompts:
+          type: array
+          items:
+            type: string
+
+    ProjectStats:
+      type: object
+      properties:
+        project:
+          type: string
+        total_observations:
+          type: integer
+        by_type:
+          type: object
+          additionalProperties:
+            type: integer
+        by_scope:
+          type: object
+          additionalProperties:
+            type: integer
+        total_sessions:
+          type: integer
+        total_edges:
+          type: integer
+        total_capsules:
+          type: integer
+
+    Edge:
+      type: object
+      properties:
+        id:
+          type: integer
+        source_id:
+          type: integer
+        target_id:
+          type: integer
+        relation:
+          type: string
+          enum: [caused_by, related_to, supersedes, blocks, part_of]
+        weight:
+          type: number
+        valid_from:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+        superseded_by:
+          type: integer
+          nullable: true
+        auto_detected:
+          type: boolean
+
+    KnowledgeCapsule:
+      type: object
+      properties:
+        id:
+          type: integer
+        topic:
+          type: string
+        project:
+          type: string
+          nullable: true
+        summary:
+          type: string
+        key_decisions:
+          type: array
+          items:
+            type: string
+        known_issues:
+          type: array
+          items:
+            type: string
+        anti_patterns:
+          type: array
+          items:
+            type: string
+        best_practices:
+          type: array
+          items:
+            type: string
+        source_observations:
+          type: array
+          items:
+            type: integer
+        confidence:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        last_consolidated:
+          type: string
+          format: date-time
+        version:
+          type: integer
+
+    AntiPattern:
+      type: object
+      properties:
+        type:
+          type: string
+        severity:
+          type: string
+        description:
+          type: string
+        suggestion:
+          type: string
+        evidence_count:
+          type: integer
+
+    ExportData:
+      type: object
+      properties:
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Observation"
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+        prompts:
+          type: array
+          items:
+            type: object
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/Edge"
+
+    ImportResult:
+      type: object
+      properties:
+        observations_imported:
+          type: integer
+        sessions_imported:
+          type: integer
+        prompts_imported:
+          type: integer
+        edges_imported:
+          type: integer
+        duplicates_skipped:
+          type: integer
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string

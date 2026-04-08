@@ -1,0 +1,19 @@
+[package]
+name = "engram-mcp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+engram-core = { workspace = true }
+engram-store = { workspace = true }
+engram-learn = { path = "../learn" }
+engram-search = { path = "../search" }
+engram-sync = { path = "../sync" }
+rmcp = { version = "1.3", features = ["server", "macros", "transport-io", "schemars"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tokio = { version = "1", features = ["full"] }
+sha2 = { workspace = true }

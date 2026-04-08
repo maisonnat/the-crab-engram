@@ -1,0 +1,15 @@
+[package]
+name = "engram-sync"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+engram-core = { workspace = true }
+engram-store = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+tracing = { workspace = true }
+flate2 = "1"
+uuid = { workspace = true }

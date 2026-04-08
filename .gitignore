@@ -1,0 +1,30 @@
+# Rust
+/target/
+**/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Engram
+*.db
+*.db-wal
+*.db-shm
+engram-chunks/
+.repo-memory/
+
+# Build artifacts
+*.exe
+*.out
+*.dll
+*.so
+*.dylib

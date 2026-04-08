@@ -1,0 +1,37 @@
+#!/bin/bash
+# engram post-commit hook
+# Auto-captures git commits as observations with attachments
+#
+# Install: engram setup --install-hooks
+# Or manually: cp plugins/hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+
+COMMIT_HASH=$(git rev-parse HEAD)
+COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD | tr '\n' ',' | sed 's/,$//')
+DIFF_SUMMARY=$(git diff --stat HEAD~1 HEAD 2>/dev/null | tail -1)
+PROJECT=$(basename "$(git rev-parse --show-toplevel)")
+
+# Build JSON array of files
+FILES_JSON=$(git diff-tree --no-commit-id --name-only -r HEAD | while read f; do echo "\"$f\""; done | paste -sd',' | sed 's/^/[/;s/$/]/')
+
+# Call engram to capture the commit
+engram capture-git \
+    --commit-hash "$COMMIT_HASH" \
+    --commit-message "$COMMIT_MSG" \
+    --files-changed "$FILES_JSON" \
+    --diff-summary "$DIFF_SUMMARY" \
+    --project "$PROJECT" \
+    2>/dev/null || true
+
+# Also capture error traces if the commit message mentions fixing errors
+if echo "$COMMIT_MSG" | grep -qiE "fix|error|bug|panic|crash"; then
+    # Try to find recent error output
+    LAST_ERROR=$(git log -1 --pretty=format:"%B" | head -5)
+    if [ -n "$LAST_ERROR" ]; then
+        engram capture-error \
+            --error-type "commit_fix" \
+            --error-message "$LAST_ERROR" \
+            --project "$PROJECT" \
+            2>/dev/null || true
+    fi
+fi

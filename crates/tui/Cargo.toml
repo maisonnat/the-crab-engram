@@ -1,0 +1,12 @@
+[package]
+name = "engram-tui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+engram-core = { workspace = true }
+engram-store = { workspace = true }
+crossterm = "0.29"
+ratatui = "0.29"
+chrono = { workspace = true }
+anyhow = { workspace = true }
