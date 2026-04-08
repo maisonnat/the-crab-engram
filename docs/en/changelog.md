@@ -1,5 +1,14 @@
 # Engram-Rust — Changelog
 
+## v2.0.0 (2026-04-08)
+
+### Features
+- initial release — The Crab Engram v2.0.0 (`56c0e36`)
+
+### Other
+- ci: add GitHub Actions CI + release workflows with auto-changelog (`9aca190`)
+- chore: remove Gentleman Programming affiliation, add acknowledgments section (`5666d9c`)
+
 ## v2.0.0 (2026-04-07)
 
 ### Summary
