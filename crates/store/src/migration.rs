@@ -75,6 +75,9 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> crate::Result<()> {
     )
     .map_err(|e| EngramError::Database(e.to_string()))?;
 
+    // Fix schema compatibility: Go engram DB may be missing columns added in Rust
+    fix_schema_compat(conn)?;
+
     for migration in MIGRATIONS {
         // Check if already applied
         let exists: bool = conn
@@ -101,6 +104,68 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> crate::Result<()> {
         .map_err(|e| EngramError::Database(e.to_string()))?;
 
         info!("Migration {:03} applied", migration.version);
+    }
+
+    Ok(())
+}
+
+/// Fix schema compatibility between Go engram DB and Rust engram DB.
+/// Adds missing columns/tables that the Go version didn't have.
+fn fix_schema_compat(conn: &rusqlite::Connection) -> crate::Result<()> {
+    let mut alter_cmds = Vec::new();
+
+    // Check observations table for missing columns (Go DB had simpler schema)
+    let obs_cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(observations)")
+        .map_err(|e| EngramError::Database(e.to_string()))?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| EngramError::Database(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let missing_obs = [
+        ("lifecycle_state", "TEXT DEFAULT 'active'"),
+        ("emotional_valence", "REAL DEFAULT 0.0"),
+        ("surprise_factor", "REAL DEFAULT 0.0"),
+        ("effort_invested", "REAL DEFAULT 0.0"),
+        ("provenance_source", "TEXT DEFAULT 'llm_reasoning'"),
+        ("provenance_confidence", "REAL DEFAULT 0.6"),
+        ("provenance_evidence", "TEXT DEFAULT '[]'"),
+        ("pinned", "INTEGER NOT NULL DEFAULT 0"),
+        ("normalized_hash", "TEXT NOT NULL DEFAULT ''"),
+    ];
+
+    for (col, col_def) in &missing_obs {
+        if !obs_cols.iter().any(|c| c == col) {
+            alter_cmds.push(format!(
+                "ALTER TABLE observations ADD COLUMN {} {}",
+                col, col_def
+            ));
+        }
+    }
+
+    // Check sessions table for missing columns
+    let sess_cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(sessions)")
+        .map_err(|e| EngramError::Database(e.to_string()))?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| EngramError::Database(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if !sess_cols.iter().any(|c| c == "summary") {
+        alter_cmds.push("ALTER TABLE sessions ADD COLUMN summary TEXT".into());
+    }
+
+    // Apply ALTER TABLE commands
+    if !alter_cmds.is_empty() {
+        info!(
+            "Schema compat: applying {} ALTER TABLE commands",
+            alter_cmds.len()
+        );
+        for cmd in &alter_cmds {
+            let _ = conn.execute_batch(cmd); // Ignore if already exists
+        }
     }
 
     Ok(())
