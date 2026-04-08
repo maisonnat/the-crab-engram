@@ -35,7 +35,7 @@
   5. Windows ARM64 uses `windows-11-arm` native runner
   6. A single target failure does not cancel other targets (`fail-fast: false`)
 **Plans**: 1 plan
-- [ ] 01-01-PLAN.md — Expand build matrix, add .deb job, update release job
+- [x] 01-01-PLAN.md — Expand build matrix, add .deb job, update release job
 
 ### Phase 2: Self-Update Engine
 

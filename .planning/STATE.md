@@ -1,3 +1,17 @@
+---
+gsd_state_version: 1.0
+milestone: v2.0.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-04-08T22:08:30.472Z"
+progress:
+  total_phases: 8
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 100
+---
+
 # Project State — The Crab Engram v2.0.0
 
 ## Project Reference
@@ -8,10 +22,11 @@
 
 ## Current Position
 
-- **Phase**: None (roadmap just created)
-- **Plan**: None
-- **Status**: Awaiting roadmap approval
-- **Progress**: `░░░░░░░░░░░░░░░░░░░░ 0/8 phases`
+- **Phase**: 01-build-matrix
+- **Plan**: 01 / 1 (completed)
+- **Current Plan**: 01 / 1
+- **Status**: Plan 01 completed, ready for next plan
+- **Progress**: `█░░░░░░░░░░░░░░░░░░░ 1/8 phases`
 
 ## Performance Metrics
 
@@ -22,6 +37,7 @@
 | Requirements/Phase (avg) | 6.5 |
 | Critical Path Length | 4 phases (1→2→6/7/8) |
 | Parallel Tracks | 2 (Build+Update vs Backup) |
+| Phase 01-build-matrix P01 | 5min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -32,6 +48,14 @@
 - `rusqlite::backup::Backup` for online SQLite backup (<100ms typical)
 - Custom Homebrew tap (not core) — faster release velocity
 - Backup as Storage trait methods — no new crate
+
+### Key Decisions (from execution)
+
+- Use `cross` for ALL Linux targets (not native ARM runners) — industry standard, simpler CI
+- Use `windows-11-arm` native runner for Windows ARM64 — cross doesn't support Windows
+- Target-triple naming: `the-crab-engram-{version}-{target}.{ext}` — required by self_update
+- `.deb` in separate job using `cargo-deb` — follows ripgrep pattern
+- Pin `cross` to v0.2.5 — avoid upstream breakage
 
 ### Critical Pitfalls to Watch
 
@@ -51,7 +75,8 @@
 | Session | Date | Activity | Notes |
 |---------|------|----------|-------|
 | 1 | 2026-04-08 | Research + Roadmap | 52 requirements, 8 phases, 100% coverage |
+| 2 | 2026-04-08 | Execute Phase 01 Plan 01 | Expanded release workflow to 8 targets with cross-compilation |
 
 ---
 
-*Last updated: 2026-04-08 — Initial roadmap creation*
+*Last updated: 2026-04-08 — Phase 01 Plan 01 completed*

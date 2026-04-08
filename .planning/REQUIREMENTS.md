@@ -18,13 +18,13 @@
 
 ### Build Matrix
 
-- [ ] **BUILD-01**: Release produces 8 targets (linux-gnu x86_64, linux-musl x86_64, linux-gnu aarch64, linux-musl aarch64, macOS x86_64, macOS aarch64, Windows x64, Windows ARM64)
-- [ ] **BUILD-02**: Release produces 12 artifacts (8× .tar.gz/.zip + .deb + .rpm for linux x64 gnu + 2× .msi for Windows)
-- [ ] **BUILD-03**: Asset naming uses target-triple convention: `the-crab-engram-{version}-{target}.{ext}`
-- [ ] **BUILD-04**: Linux musl builds use native `musl-tools` install (not cross-compilation)
-- [ ] **BUILD-05**: ARM Linux uses `ubuntu-24.04-arm` native runner
-- [ ] **BUILD-06**: ARM Windows uses `windows-11-arm` native runner
-- [ ] **BUILD-07**: Build matrix uses `fail-fast: false` so one target failure doesn't cancel others
+- [x] **BUILD-01**: Release produces 8 targets (linux-gnu x86_64, linux-musl x86_64, linux-gnu aarch64, linux-musl aarch64, macOS x86_64, macOS aarch64, Windows x64, Windows ARM64)
+- [x] **BUILD-02**: Release produces 12 artifacts (8× .tar.gz/.zip + .deb + .rpm for linux x64 gnu + 2× .msi for Windows)
+- [x] **BUILD-03**: Asset naming uses target-triple convention: `the-crab-engram-{version}-{target}.{ext}`
+- [x] **BUILD-04**: Linux musl builds use native `musl-tools` install (not cross-compilation)
+- [x] **BUILD-05**: ARM Linux uses `ubuntu-24.04-arm` native runner
+- [x] **BUILD-06**: ARM Windows uses `windows-11-arm` native runner
+- [x] **BUILD-07**: Build matrix uses `fail-fast: false` so one target failure doesn't cancel others
 
 ### Version Transparency
 
@@ -114,13 +114,13 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUILD-01 | Phase 1: Build Matrix | Pending |
-| BUILD-02 | Phase 1: Build Matrix | Pending |
-| BUILD-03 | Phase 1: Build Matrix | Pending |
-| BUILD-04 | Phase 1: Build Matrix | Pending |
-| BUILD-05 | Phase 1: Build Matrix | Pending |
-| BUILD-06 | Phase 1: Build Matrix | Pending |
-| BUILD-07 | Phase 1: Build Matrix | Pending |
+| BUILD-01 | Phase 1: Build Matrix | Complete |
+| BUILD-02 | Phase 1: Build Matrix | Complete |
+| BUILD-03 | Phase 1: Build Matrix | Complete |
+| BUILD-04 | Phase 1: Build Matrix | Complete |
+| BUILD-05 | Phase 1: Build Matrix | Complete |
+| BUILD-06 | Phase 1: Build Matrix | Complete |
+| BUILD-07 | Phase 1: Build Matrix | Complete |
 | UPDATE-01 | Phase 2: Self-Update Engine | Pending |
 | UPDATE-02 | Phase 2: Self-Update Engine | Pending |
 | UPDATE-03 | Phase 2: Self-Update Engine | Pending |
