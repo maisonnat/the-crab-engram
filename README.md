@@ -27,7 +27,7 @@ Unlike simple CRUD memory stores, The Crab Engram has **7 engines** that observe
 
 ```
 Agent (Claude Code / Cursor / OpenCode / Codex / VS Code / ...)
-    ↓ MCP stdio (31 tools)
+    ↓ MCP stdio (32 tools)
 The Crab Engram (single Rust binary)
     ↓
 ┌─────────────────────────────────────────────┐
@@ -123,7 +123,7 @@ crates/
 ├── store/      → SQLite + FTS5 storage (35 trait methods), migrations, graph, beliefs
 ├── search/     → Embedder, hybrid search (Reciprocal Rank Fusion), cosine similarity
 ├── learn/      → 7 auto-learning engines
-├── mcp/        → MCP server (stdio) — 31 tools, 3 resources, stream events
+├── mcp/        → MCP server (stdio) — 32 tools, 3 resources, stream events
 ├── api/        → HTTP API (Axum) — 14 routes
 ├── sync/       → CRDT LWW, chunk export/import, conflict resolution
 └── tui/        → Terminal UI (Ratatui) — 6 tabs
@@ -131,7 +131,7 @@ crates/
 
 ```mermaid
 graph TD
-    Agent[AI Agent] -->|MCP stdio| MCP[MCP Server<br/>31 tools]
+    Agent[AI Agent] -->|MCP stdio| MCP[MCP Server<br/>32 tools]
     Agent -->|HTTP| API[HTTP API<br/>14 routes]
     Agent -->|CLI| CLI[CLI<br/>11 commands]
     Agent -->|TUI| TUI[TUI<br/>6 tabs]
@@ -151,7 +151,7 @@ graph TD
 ## MCP Tools
 
 <details>
-<summary><b>31 tools available</b> (click to expand)</summary>
+<summary><b>32 tools available</b> (click to expand)</summary>
 
 | Tool | Description |
 |---|---|
@@ -168,24 +168,26 @@ graph TD
 | `mem_session_end` | Mark session complete |
 | `mem_session_summary` | End-of-session structured save |
 | `mem_capture_passive` | Extract learnings from text output |
+| `mem_capture_git` | Capture git commit as observation with GitCommit + CodeDiff |
+| `mem_capture_error` | Capture compilation/test error with ErrorTrace |
 | `mem_suggest_topic_key` | Stable key for evolving topics |
 | `mem_merge_projects` | Merge project name variants (Admin) |
 | `mem_consolidate` | Run consolidation engine |
 | `mem_antipatterns` | Detect anti-patterns |
-| `mem_inject` | Build smart injection context |
+| `mem_inject` | Smart context injection for a task |
 | `mem_synthesize` | Synthesize knowledge capsule |
+| `mem_capsule_list` | List all knowledge capsules |
+| `mem_capsule_get` | Get full capsule with decisions, issues, patterns |
 | `mem_knowledge_boundary` | Compute/list knowledge boundaries |
 | `mem_stream` | Real-time memory events (5 modes) |
 | `mem_reviews` | Pending spaced repetition reviews |
 | `mem_beliefs` | Query beliefs about a subject |
 | `mem_sync` | Sync operations (status/export/import) |
-| `mem_add_edge` | Add graph edge |
-| `mem_add_boundary` | Add knowledge boundary |
-| `mem_export` | Export to JSON |
-| `mem_import` | Import from JSON |
-| `mem_open_graph` | Open graph visualization |
-| `mem_transfer` | Transfer observations between projects |
+| `mem_relate` | Add typed graph edge between observations |
 | `mem_graph` | Get graph data for visualization |
+| `mem_open_graph` | Open graph visualization |
+| `mem_pin` | Pin/unpin observation — pinned gets maximum relevance |
+| `mem_transfer` | Transfer observations between projects |
 
 </details>
 
@@ -265,7 +267,7 @@ engram tui
 
 | Feature | engram (Go) | mem0 (Python) | **The Crab Engram** 🦀 |
 |---|---|---|---|
-| MCP Server | ✅ 15 tools | ❌ | ✅ **31 tools** |
+| MCP Server | ✅ 15 tools | ❌ | ✅ **32 tools** |
 | Auto-Learning | ❌ | ❌ | ✅ **7 engines** |
 | Encryption | ❌ | ❌ | ✅ **ChaCha20** |
 | Multi-Agent | ❌ | ❌ | ✅ **Permissions** |

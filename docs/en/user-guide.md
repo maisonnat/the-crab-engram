@@ -104,6 +104,8 @@ mem_context(project="my-project", limit=10)
 | Tool | What It Does |
 |---|---|
 | `mem_capture_passive` | Analyze agent output and auto-extract learnings (errors, changes, test results) |
+| `mem_capture_git` | Capture a git commit as observation with GitCommit + CodeDiff attachments |
+| `mem_capture_error` | Capture compilation/test error with ErrorTrace attachment |
 | `mem_stream` | Detect real-time events: file context, deja-vu, anti-patterns, pending reviews |
 | `mem_inject` | Build smart context injection for a task (relevant memories + warnings + boundaries) |
 
@@ -111,9 +113,11 @@ mem_context(project="my-project", limit=10)
 
 | Tool | What It Does |
 |---|---|
-| `mem_add_edge` | Add typed edge between two observations (supersedes, depends_on, contradicts) |
+| `mem_relate` | Add typed edge between two observations |
 | `mem_graph` | Get graph data for visualization |
 | `mem_synthesize` | Generate KnowledgeCapsule from related observations |
+| `mem_capsule_list` | List all knowledge capsules |
+| `mem_capsule_get` | Get full capsule with decisions, issues, patterns |
 | `mem_open_graph` | Open graph visualization |
 
 ### Maintenance Tools
@@ -127,6 +131,7 @@ mem_context(project="my-project", limit=10)
 | `mem_reviews` | Spaced repetition review queue |
 | `mem_beliefs` | Query evolving beliefs about subjects |
 | `mem_sync` | Sync status, chunk export/import |
+| `mem_pin` | Pin/unpin observation — pinned gets maximum relevance score |
 
 ---
 
