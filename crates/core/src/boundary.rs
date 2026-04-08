@@ -48,23 +48,12 @@ impl ConfidenceLevel {
 }
 
 /// Evidence supporting a knowledge boundary.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BoundaryEvidence {
     pub observations_count: u32,
     pub successful_applications: u32,
     pub failed_applications: u32,
     pub last_used: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-impl Default for BoundaryEvidence {
-    fn default() -> Self {
-        Self {
-            observations_count: 0,
-            successful_applications: 0,
-            failed_applications: 0,
-            last_used: None,
-        }
-    }
 }
 
 /// Tracks what the system knows about a domain.

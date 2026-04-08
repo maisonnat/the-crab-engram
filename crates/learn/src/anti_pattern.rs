@@ -278,9 +278,7 @@ impl AntiPatternDetector {
                     ),
                     evidence: mentions.clone(),
                     severity,
-                    suggestion: format!(
-                        "This file is frequently modified. Consider refactoring or splitting responsibilities."
-                    ),
+                    suggestion: "This file is frequently modified. Consider refactoring or splitting responsibilities.".to_string(),
                 });
             }
         }
@@ -361,9 +359,11 @@ mod tests {
         let detector = AntiPatternDetector::new(store, None);
         let patterns = detector.detect_all("test").unwrap();
         // Only unverified decisions should be found without embedder
-        assert!(patterns
-            .iter()
-            .all(|p| p.r#type == AntiPatternType::UnverifiedDecision));
+        assert!(
+            patterns
+                .iter()
+                .all(|p| p.r#type == AntiPatternType::UnverifiedDecision)
+        );
     }
 
     #[test]

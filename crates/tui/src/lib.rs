@@ -1,6 +1,6 @@
 pub mod app;
 
-pub use app::{draw, App, AppState};
+pub use app::{App, AppState, draw};
 
 use engram_store::SqliteStore;
 
@@ -9,9 +9,9 @@ pub fn run_tui(store: SqliteStore, project: &str) -> anyhow::Result<()> {
     use crossterm::{
         event::{self, Event, KeyCode, KeyEventKind},
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     };
-    use ratatui::{backend::CrosstermBackend, Terminal};
+    use ratatui::{Terminal, backend::CrosstermBackend};
     use std::io;
 
     enable_raw_mode()?;
@@ -24,58 +24,58 @@ pub fn run_tui(store: SqliteStore, project: &str) -> anyhow::Result<()> {
     app.refresh_stats();
 
     loop {
-        terminal.draw(|f| draw(f, &mut app))?;
+        terminal.draw(|f| draw(f, &app))?;
 
-        if event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
+        if event::poll(std::time::Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+        {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+            match key.code {
+                KeyCode::Char('q') => app.should_quit = true,
+                KeyCode::Char('1') => app.state = AppState::Dashboard,
+                KeyCode::Char('2') => app.state = AppState::Search,
+                KeyCode::Char('3') => {
+                    app.state = AppState::Capsules;
+                    app.refresh_capsules();
                 }
-                match key.code {
-                    KeyCode::Char('q') => app.should_quit = true,
-                    KeyCode::Char('1') => app.state = AppState::Dashboard,
-                    KeyCode::Char('2') => app.state = AppState::Search,
-                    KeyCode::Char('3') => {
-                        app.state = AppState::Capsules;
-                        app.refresh_capsules();
-                    }
-                    KeyCode::Char('4') => {
-                        app.state = AppState::Boundaries;
-                        app.refresh_boundaries();
-                    }
-                    KeyCode::Backspace => {
-                        if app.state == AppState::Search {
-                            app.search_query.pop();
-                        }
-                    }
-                    KeyCode::Enter => {
-                        if app.state == AppState::Search && !app.search_query.is_empty() {
-                            app.search();
-                        } else if app.state == AppState::Search && !app.search_results.is_empty() {
-                            app.state = AppState::Detail;
-                            app.detail_observation =
-                                app.search_results.get(app.selected_index).cloned();
-                        }
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        if app.selected_index > 0 {
-                            app.selected_index -= 1;
-                        }
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        if app.selected_index < app.search_results.len().saturating_sub(1) {
-                            app.selected_index += 1;
-                        }
-                    }
-                    KeyCode::Esc => {
-                        app.state = AppState::Dashboard;
-                        app.detail_observation = None;
-                    }
-                    KeyCode::Char(c) if app.state == AppState::Search => {
-                        app.search_query.push(c);
-                    }
-                    _ => {}
+                KeyCode::Char('4') => {
+                    app.state = AppState::Boundaries;
+                    app.refresh_boundaries();
                 }
+                KeyCode::Backspace => {
+                    if app.state == AppState::Search {
+                        app.search_query.pop();
+                    }
+                }
+                KeyCode::Enter => {
+                    if app.state == AppState::Search && !app.search_query.is_empty() {
+                        app.search();
+                    } else if app.state == AppState::Search && !app.search_results.is_empty() {
+                        app.state = AppState::Detail;
+                        app.detail_observation =
+                            app.search_results.get(app.selected_index).cloned();
+                    }
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if app.selected_index > 0 {
+                        app.selected_index -= 1;
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if app.selected_index < app.search_results.len().saturating_sub(1) {
+                        app.selected_index += 1;
+                    }
+                }
+                KeyCode::Esc => {
+                    app.state = AppState::Dashboard;
+                    app.detail_observation = None;
+                }
+                KeyCode::Char(c) if app.state == AppState::Search => {
+                    app.search_query.push(c);
+                }
+                _ => {}
             }
         }
 

@@ -5,8 +5,8 @@ use rmcp::model::*;
 
 use engram_core::{ObservationType, Scope};
 use engram_learn::{
-    AntiPatternDetector, BoundaryTracker, CapsuleBuilder, ConsolidationEngine,
-    GraphEvolver, HeuristicSynthesizer, MemoryStream, SmartInjector,
+    AntiPatternDetector, BoundaryTracker, CapsuleBuilder, ConsolidationEngine, GraphEvolver,
+    HeuristicSynthesizer, MemoryStream, SmartInjector,
 };
 use engram_store::{AddObservationParams, SearchOptions, UpdateObservationParams};
 
@@ -111,7 +111,9 @@ fn error_result(msg: &str) -> CallToolResult {
 }
 
 fn get_string(args: &HashMap<String, serde_json::Value>, key: &str) -> Option<String> {
-    args.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+    args.get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 fn get_i64(args: &HashMap<String, serde_json::Value>, key: &str) -> Option<i64> {
@@ -642,15 +644,18 @@ async fn tool_save_handler(
     };
     let type_str = get_string(&args, "type").unwrap_or_else(|| "manual".into());
     let scope_str = get_string(&args, "scope").unwrap_or_else(|| "project".into());
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
     let topic_key = get_string(&args, "topic_key");
 
     let obs_type: ObservationType = match type_str.parse() {
         Ok(t) => t,
         Err(_) => return Ok(error_result(&format!("invalid type: {type_str}"))),
     };
-    let scope: Scope = if scope_str == "personal" { Scope::Personal } else { Scope::Project };
+    let scope: Scope = if scope_str == "personal" {
+        Scope::Personal
+    } else {
+        Scope::Project
+    };
 
     let params = AddObservationParams {
         r#type: obs_type,
@@ -669,7 +674,9 @@ async fn tool_save_handler(
             let mut attachment_count = 0;
             if let Some(attachments_arr) = args.get("attachments").and_then(|v| v.as_array()) {
                 for att_json in attachments_arr {
-                    if let Ok(att) = serde_json::from_value::<engram_core::Attachment>(att_json.clone()) {
+                    if let Ok(att) =
+                        serde_json::from_value::<engram_core::Attachment>(att_json.clone())
+                    {
                         match server.store.store_attachment(id, &att) {
                             Ok(_) => attachment_count += 1,
                             Err(e) => {
@@ -687,20 +694,24 @@ async fn tool_save_handler(
             };
 
             // Belief extraction from content
-            let _ = extract_and_upsert_beliefs(server, id, &params.content, &params.project);
+            extract_and_upsert_beliefs(server, id, &params.content, &params.project);
 
             // Anti-pattern check for bugfix saves
             let warning = if obs_type == engram_core::ObservationType::Bugfix {
-                let bugfixes = server.store.search(&SearchOptions {
-                    query: String::new(),
-                    project: Some(params.project.clone()),
-                    r#type: Some(engram_core::ObservationType::Bugfix),
-                    limit: Some(200),
-                    ..Default::default()
-                }).unwrap_or_default();
+                let bugfixes = server
+                    .store
+                    .search(&SearchOptions {
+                        query: String::new(),
+                        project: Some(params.project.clone()),
+                        r#type: Some(engram_core::ObservationType::Bugfix),
+                        limit: Some(200),
+                        ..Default::default()
+                    })
+                    .unwrap_or_default();
 
                 // Check if this file/path appears in 3+ bugs
-                let mut file_hits: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+                let mut file_hits: std::collections::HashMap<String, usize> =
+                    std::collections::HashMap::new();
                 for bug in &bugfixes {
                     for word in format!("{} {}", bug.title, bug.content).split_whitespace() {
                         if word.contains(".rs") || word.contains(".ts") || word.contains(".go") {
@@ -708,9 +719,14 @@ async fn tool_save_handler(
                         }
                     }
                 }
-                file_hits.into_iter()
+                file_hits
+                    .into_iter()
                     .filter(|(_, c)| *c >= 3)
-                    .map(|(f, c)| format!("\n⚠️ Anti-pattern: `{f}` has {c} bugs — consider root cause analysis"))
+                    .map(|(f, c)| {
+                        format!(
+                            "\n⚠️ Anti-pattern: `{f}` has {c} bugs — consider root cause analysis"
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join("")
             } else {
@@ -765,7 +781,8 @@ async fn tool_search_handler(
             }
 
             // Suggest capsule if >5 results share a topic_key
-            let mut topic_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            let mut topic_counts: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
             for obs in &results {
                 if let Some(ref topic) = obs.topic_key {
                     *topic_counts.entry(topic.clone()).or_insert(0) += 1;
@@ -789,8 +806,7 @@ async fn tool_context_handler(
     server: &EngramServer,
     args: HashMap<String, serde_json::Value>,
 ) -> Result<CallToolResult, ErrorData> {
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
     let limit = get_usize(&args, "limit").unwrap_or(10);
 
     match server.store.get_session_context(&project, limit) {
@@ -803,15 +819,19 @@ async fn tool_context_handler(
             ));
 
             // Anti-pattern warnings
-            let bugfixes = server.store.search(&engram_store::SearchOptions {
-                query: String::new(),
-                project: Some(project.clone()),
-                r#type: Some(engram_core::ObservationType::Bugfix),
-                limit: Some(200),
-                ..Default::default()
-            }).unwrap_or_default();
+            let bugfixes = server
+                .store
+                .search(&engram_store::SearchOptions {
+                    query: String::new(),
+                    project: Some(project.clone()),
+                    r#type: Some(engram_core::ObservationType::Bugfix),
+                    limit: Some(200),
+                    ..Default::default()
+                })
+                .unwrap_or_default();
 
-            let mut file_bug_count: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            let mut file_bug_count: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
             for bug in &bugfixes {
                 for word in format!("{} {}", bug.title, bug.content).split_whitespace() {
                     if word.contains(".rs") || word.contains(".ts") || word.contains(".go") {
@@ -823,7 +843,9 @@ async fn tool_context_handler(
             if !warnings.is_empty() {
                 text.push_str("### ⚠️ Warnings\n\n");
                 for (file, count) in &warnings {
-                    text.push_str(&format!("- `{file}` has {count} recurring bugs — consider root cause analysis\n"));
+                    text.push_str(&format!(
+                        "- `{file}` has {count} recurring bugs — consider root cause analysis\n"
+                    ));
                 }
                 text.push('\n');
             }
@@ -833,7 +855,9 @@ async fn tool_context_handler(
                 for obs in &ctx.observations {
                     text.push_str(&format!(
                         "- **#{}** [{}] {} — {}\n",
-                        obs.id, obs.r#type, obs.title,
+                        obs.id,
+                        obs.r#type,
+                        obs.title,
                         obs.content.chars().take(100).collect::<String>()
                     ));
                 }
@@ -881,8 +905,7 @@ async fn tool_session_start_handler(
     server: &EngramServer,
     args: HashMap<String, serde_json::Value>,
 ) -> Result<CallToolResult, ErrorData> {
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
     match server.store.create_session(&project) {
         Ok(id) => Ok(text_result(format!(
@@ -903,7 +926,10 @@ async fn tool_session_end_handler(
     let summary = get_string(&args, "summary");
 
     match server.store.end_session(&session_id, summary.as_deref()) {
-        Ok(()) => Ok(text_result(format!("🔴 Session {} ended.", &session_id[..8]))),
+        Ok(()) => Ok(text_result(format!(
+            "🔴 Session {} ended.",
+            &session_id[..8]
+        ))),
         Err(e) => Ok(error_result(&format!("failed: {e}"))),
     }
 }
@@ -919,12 +945,13 @@ async fn tool_get_handler(
 
     match server.store.get_observation(id) {
         Ok(Some(obs)) => {
+            let prov_source = format!("{:?}", obs.provenance_source);
             let text = format!(
                 "## Observation #{id}\n\n\
                  **Type:** {}\n**Scope:** {}\n**Title:** {}\n\
                  **Topic:** {}\n**Created:** {}\n\
                  **Access count:** {}\n**Pinned:** {}\n\
-                 **Provenance:** {} ({:.0}%)\n\n\
+                 **Provenance:** {prov_source} ({:.0}%)\n\n\
                  ---\n\n{}",
                 obs.r#type,
                 obs.scope,
@@ -933,7 +960,6 @@ async fn tool_get_handler(
                 obs.created_at.format("%Y-%m-%d %H:%M"),
                 obs.access_count,
                 obs.pinned,
-                format!("{:?}", obs.provenance_source),
                 obs.provenance_confidence * 100.0,
                 obs.content,
             );
@@ -978,8 +1004,7 @@ async fn tool_capture_handler(
         Some(s) => s,
         None => return Ok(error_result("missing 'session_id'")),
     };
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
     let lower = output.to_lowercase();
     let mut captured = Vec::new();
@@ -1021,9 +1046,12 @@ async fn tool_capture_handler(
                     &format!("{title} {}", output.chars().take(200).collect::<String>()),
                     None,
                 );
-                let _ = server.store.update_observation(id, &engram_store::UpdateObservationParams {
-                    ..Default::default()
-                });
+                let _ = server.store.update_observation(
+                    id,
+                    &engram_store::UpdateObservationParams {
+                        ..Default::default()
+                    },
+                );
                 results.push_str(&format!(
                     "- #{id} [{type_str}] {title} (salience: {:.0}%)\n",
                     (salience.emotional_valence.abs() + salience.surprise_factor) * 50.0
@@ -1050,8 +1078,7 @@ async fn tool_save_prompt_handler(
         Some(c) => c,
         None => return Ok(error_result("missing 'content'")),
     };
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
     let params = engram_store::AddPromptParams {
         session_id,
@@ -1099,7 +1126,9 @@ async fn tool_delete_handler(
 
     // Permission check — delete requires Admin
     if server.config.profile == ToolProfile::Agent {
-        return Ok(error_result("delete requires Admin profile. Use --profile admin"));
+        return Ok(error_result(
+            "delete requires Admin profile. Use --profile admin",
+        ));
     }
 
     let hard = get_bool(&args, "hard").unwrap_or(false);
@@ -1117,13 +1146,15 @@ async fn tool_stats_handler(
     server: &EngramServer,
     args: HashMap<String, serde_json::Value>,
 ) -> Result<CallToolResult, ErrorData> {
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
     match server.store.get_stats(&project) {
         Ok(stats) => {
             let mut text = format!("## Stats for \"{project}\"\n\n");
-            text.push_str(&format!("- **Total observations:** {}\n", stats.total_observations));
+            text.push_str(&format!(
+                "- **Total observations:** {}\n",
+                stats.total_observations
+            ));
             text.push_str(&format!("- **Total sessions:** {}\n", stats.total_sessions));
             text.push_str(&format!("- **Total edges:** {}\n\n", stats.total_edges));
 
@@ -1229,12 +1260,15 @@ async fn tool_capture_git_handler(
         Some(s) => s,
         None => return Ok(error_result("missing 'session_id'")),
     };
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
     let files_changed: Vec<String> = args
         .get("files_changed")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let diff_summary = get_string(&args, "diff_summary").unwrap_or_default();
 
@@ -1242,8 +1276,15 @@ async fn tool_capture_git_handler(
     let params = AddObservationParams {
         r#type: engram_core::ObservationType::FileChange,
         scope: engram_core::Scope::Project,
-        title: format!("{}: {}", &commit_hash[..8.min(commit_hash.len())], truncate_str(&commit_message, 80)),
-        content: format!("Commit: {commit_hash}\nMessage: {commit_message}\nFiles: {}", files_changed.join(", ")),
+        title: format!(
+            "{}: {}",
+            &commit_hash[..8.min(commit_hash.len())],
+            truncate_str(&commit_message, 80)
+        ),
+        content: format!(
+            "Commit: {commit_hash}\nMessage: {commit_message}\nFiles: {}",
+            files_changed.join(", ")
+        ),
         session_id: session_id.clone(),
         project: project.clone(),
         topic_key: Some(format!("git/{}", &commit_hash[..8.min(commit_hash.len())])),
@@ -1266,16 +1307,16 @@ async fn tool_capture_git_handler(
             };
 
             // Store CodeDiff attachment if diff_summary is present
-            if !diff_summary.is_empty() {
-                if let Some(first_file) = files_changed.first() {
-                    let diff_att = engram_core::Attachment::CodeDiff {
-                        file_path: first_file.clone(),
-                        before_hash: String::new(),
-                        after_hash: commit_hash.clone(),
-                        diff: diff_summary.clone(),
-                    };
-                    let _ = server.store.store_attachment(obs_id, &diff_att);
-                }
+            if !diff_summary.is_empty()
+                && let Some(first_file) = files_changed.first()
+            {
+                let diff_att = engram_core::Attachment::CodeDiff {
+                    file_path: first_file.clone(),
+                    before_hash: String::new(),
+                    after_hash: commit_hash.clone(),
+                    diff: diff_summary.clone(),
+                };
+                let _ = server.store.store_attachment(obs_id, &diff_att);
             }
 
             Ok(text_result(format!(
@@ -1304,8 +1345,7 @@ async fn tool_capture_error_handler(
         Some(s) => s,
         None => return Ok(error_result("missing 'session_id'")),
     };
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
     let stack_trace = get_string(&args, "stack_trace").unwrap_or_default();
     let file_line = get_string(&args, "file_line").unwrap_or_default();
 
@@ -1314,7 +1354,10 @@ async fn tool_capture_error_handler(
         r#type: engram_core::ObservationType::Bugfix,
         scope: engram_core::Scope::Project,
         title: format!("{error_type}: {}", truncate_str(&error_message, 80)),
-        content: format!("Error: {error_message}\nLocation: {file_line}\nStack: {}", truncate_str(&stack_trace, 500)),
+        content: format!(
+            "Error: {error_message}\nLocation: {file_line}\nStack: {}",
+            truncate_str(&stack_trace, 500)
+        ),
         session_id: session_id.clone(),
         project: project.clone(),
         topic_key: Some(format!("bug/{error_type}")),
@@ -1350,8 +1393,7 @@ async fn tool_stream_handler(
     server: &EngramServer,
     args: HashMap<String, serde_json::Value>,
 ) -> Result<CallToolResult, ErrorData> {
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
     let file_path = get_string(&args, "file_path");
     let task_description = get_string(&args, "task_description");
     let mode = get_string(&args, "mode").unwrap_or_else(|| "file_context".into());
@@ -1375,11 +1417,11 @@ async fn tool_stream_handler(
         }
         "anti_patterns" => {
             let content = get_string(&args, "content").unwrap_or_default();
-            stream.detect_anti_pattern_warnings(&project, &content).unwrap_or_default()
+            stream
+                .detect_anti_pattern_warnings(&project, &content)
+                .unwrap_or_default()
         }
-        "pending_reviews" => {
-            stream.detect_pending_reviews(&project).unwrap_or_default()
-        }
+        "pending_reviews" => stream.detect_pending_reviews(&project).unwrap_or_default(),
         "entities" => {
             let text = get_string(&args, "text").unwrap_or_default();
             stream.detect_entities(&text).unwrap_or_default()
@@ -1421,10 +1463,7 @@ async fn tool_relate_handler(
         Some(r) => r,
         None => return Ok(error_result("missing 'relation'")),
     };
-    let weight = args
-        .get("weight")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(1.0);
+    let weight = args.get("weight").and_then(|v| v.as_f64()).unwrap_or(1.0);
 
     let relation = match relation_str.as_str() {
         "caused_by" => engram_core::RelationType::CausedBy,
@@ -1490,7 +1529,9 @@ async fn tool_graph_handler(
         for (obs, rel, depth) in &related {
             text.push_str(&format!(
                 "- **#{}** [depth {depth}] [{:?}] {} — {}\n",
-                obs.id, rel, obs.title,
+                obs.id,
+                rel,
+                obs.title,
                 obs.content.chars().take(80).collect::<String>()
             ));
         }
@@ -1538,8 +1579,7 @@ async fn tool_inject_handler(
         Some(t) => t,
         None => return Ok(error_result("missing 'task_description'")),
     };
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
     let max_tokens = get_usize(&args, "max_tokens").unwrap_or(2000);
 
     let injector = SmartInjector::new(server.store.clone());
@@ -1557,27 +1597,21 @@ async fn tool_synthesize_handler(
         Some(t) => t,
         None => return Ok(error_result("missing 'topic'")),
     };
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
-    let builder = CapsuleBuilder::new(
-        server.store.clone(),
-        Box::new(HeuristicSynthesizer),
-    );
+    let builder = CapsuleBuilder::new(server.store.clone(), Box::new(HeuristicSynthesizer));
     match builder.build_capsule(&project, &topic) {
-        Ok(capsule) => {
-            match server.store.upsert_capsule(&capsule) {
-                Ok(id) => Ok(text_result(format!(
-                    "✅ Capsule synthesized #{id}: '{}' (confidence: {:.0}%, {} sources, {} decisions, {} issues)",
-                    capsule.topic,
-                    capsule.confidence * 100.0,
-                    capsule.source_observations.len(),
-                    capsule.key_decisions.len(),
-                    capsule.known_issues.len(),
-                ))),
-                Err(e) => Ok(error_result(&format!("failed to save capsule: {e}"))),
-            }
-        }
+        Ok(capsule) => match server.store.upsert_capsule(&capsule) {
+            Ok(id) => Ok(text_result(format!(
+                "✅ Capsule synthesized #{id}: '{}' (confidence: {:.0}%, {} sources, {} decisions, {} issues)",
+                capsule.topic,
+                capsule.confidence * 100.0,
+                capsule.source_observations.len(),
+                capsule.key_decisions.len(),
+                capsule.known_issues.len(),
+            ))),
+            Err(e) => Ok(error_result(&format!("failed to save capsule: {e}"))),
+        },
         Err(e) => Ok(error_result(&format!("capsule synthesis failed: {e}"))),
     }
 }
@@ -1631,8 +1665,7 @@ async fn tool_antipatterns_handler(
     server: &EngramServer,
     args: HashMap<String, serde_json::Value>,
 ) -> Result<CallToolResult, ErrorData> {
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
     let detector = AntiPatternDetector::new(server.store.clone(), None);
     match detector.detect_all(&project) {
@@ -1655,8 +1688,7 @@ async fn tool_consolidate_handler(
     server: &EngramServer,
     args: HashMap<String, serde_json::Value>,
 ) -> Result<CallToolResult, ErrorData> {
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
     let engine = ConsolidationEngine::new(server.store.clone(), None);
     match engine.run_consolidation(&project) {
@@ -1664,7 +1696,9 @@ async fn tool_consolidate_handler(
             // Evolve graph after consolidation
             let evolver = GraphEvolver::new(server.store.clone(), None);
             let edge_info = match evolver.evolve(&project) {
-                Ok(ev) if ev.edges_created > 0 => format!("\n  - {} graph edges created", ev.edges_created),
+                Ok(ev) if ev.edges_created > 0 => {
+                    format!("\n  - {} graph edges created", ev.edges_created)
+                }
                 _ => String::new(),
             };
             Ok(text_result(format!(
@@ -1690,13 +1724,14 @@ async fn tool_knowledge_boundary_handler(
         let evidence = get_string(&args, "evidence").unwrap_or_default();
 
         match server.store.upsert_boundary(&domain, &level, &evidence) {
-            Ok(()) => Ok(text_result(format!("✅ Boundary updated: `{domain}` = {level}"))),
+            Ok(()) => Ok(text_result(format!(
+                "✅ Boundary updated: `{domain}` = {level}"
+            ))),
             Err(e) => Ok(error_result(&format!("failed: {e}"))),
         }
     } else {
         // Compute boundaries from observations using BoundaryTracker
-        let project = get_string(&args, "project")
-            .unwrap_or_else(|| server.config.project.clone());
+        let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
         let tracker = BoundaryTracker::new(server.store.clone());
         match tracker.compute_boundaries(&project) {
             Ok(boundaries) => {
@@ -1718,17 +1753,22 @@ async fn tool_transfer_handler(
     server: &EngramServer,
     args: HashMap<String, serde_json::Value>,
 ) -> Result<CallToolResult, ErrorData> {
-    let project = get_string(&args, "project")
-        .unwrap_or_else(|| server.config.project.clone());
+    let project = get_string(&args, "project").unwrap_or_else(|| server.config.project.clone());
 
     match server.store.get_transfers(&project) {
         Ok(transfers) => {
             if transfers.is_empty() {
-                return Ok(text_result("No knowledge transfers available for this project.".into()));
+                return Ok(text_result(
+                    "No knowledge transfers available for this project.".into(),
+                ));
             }
             let mut text = format!("## 🔄 Knowledge Transfers ({})\n\n", transfers.len());
             for (id, source, _capsule_id, relevance, accepted) in &transfers {
-                let status = if *accepted { "✅ accepted" } else { "⏳ pending" };
+                let status = if *accepted {
+                    "✅ accepted"
+                } else {
+                    "⏳ pending"
+                };
                 text.push_str(&format!(
                     "- **#{id}** from `{source}` (relevance: {relevance:.0}%) — {status}\n"
                 ));
@@ -1774,7 +1814,9 @@ async fn tool_beliefs_handler(
     match server.store.get_beliefs(&subject) {
         Ok(beliefs) => {
             if beliefs.is_empty() {
-                return Ok(text_result(format!("No beliefs recorded about '{subject}'.")));
+                return Ok(text_result(format!(
+                    "No beliefs recorded about '{subject}'."
+                )));
             }
             let mut text = format!("## 🧠 Beliefs about '{subject}' ({})\n\n", beliefs.len());
             for (subj, pred, val, conf, state) in &beliefs {
@@ -1812,9 +1854,16 @@ async fn tool_sync_handler(
             let path = std::path::Path::new(&dir);
             match engram_sync::export_chunks(&*server.store, Some(&server.config.project), path) {
                 Ok(manifest) => {
-                    let mut text = format!("✅ Exported {} chunk(s) to `{}`\n\n", manifest.chunks.len(), dir);
+                    let mut text = format!(
+                        "✅ Exported {} chunk(s) to `{}`\n\n",
+                        manifest.chunks.len(),
+                        dir
+                    );
                     for chunk in &manifest.chunks {
-                        text.push_str(&format!("- {} ({} bytes, {} observations)\n", chunk.filename, chunk.size, chunk.observation_count));
+                        text.push_str(&format!(
+                            "- {} ({} bytes, {} observations)\n",
+                            chunk.filename, chunk.size, chunk.observation_count
+                        ));
                     }
                     Ok(text_result(text))
                 }
@@ -1826,12 +1875,17 @@ async fn tool_sync_handler(
             match engram_sync::import_chunks(&*server.store, path) {
                 Ok(result) => Ok(text_result(format!(
                     "✅ Imported from `{}`:\n- {} observations\n- {} sessions\n- {} duplicates skipped",
-                    dir, result.observations_imported, result.sessions_imported, result.duplicates_skipped,
+                    dir,
+                    result.observations_imported,
+                    result.sessions_imported,
+                    result.duplicates_skipped,
                 ))),
                 Err(e) => Ok(error_result(&format!("import failed: {e}"))),
             }
         }
-        _ => Ok(error_result("unknown sync action. Use: status, export, import")),
+        _ => Ok(error_result(
+            "unknown sync action. Use: status, export, import",
+        )),
     }
 }
 
@@ -1845,7 +1899,13 @@ fn extract_and_upsert_beliefs(
     _project: &str,
 ) {
     // Simple heuristic: look for patterns like "X uses Y", "X is Y", "X requires Y"
-    let patterns = [" uses ", " is ", " requires ", " depends on ", " implements "];
+    let patterns = [
+        " uses ",
+        " is ",
+        " requires ",
+        " depends on ",
+        " implements ",
+    ];
     for line in content.lines() {
         for pattern in &patterns {
             if let Some(pos) = line.find(pattern) {
@@ -1854,14 +1914,14 @@ fn extract_and_upsert_beliefs(
                 let value = rest.trim().trim_end_matches('.').trim_end_matches(',');
                 let predicate = pattern.trim();
 
-                if !subject.is_empty() && !value.is_empty() && subject.len() < 100 && value.len() < 200 {
-                    let _ = server.store.upsert_belief(
-                        subject,
-                        predicate,
-                        value,
-                        0.5,
-                        "active",
-                    );
+                if !subject.is_empty()
+                    && !value.is_empty()
+                    && subject.len() < 100
+                    && value.len() < 200
+                {
+                    let _ = server
+                        .store
+                        .upsert_belief(subject, predicate, value, 0.5, "active");
                 }
             }
         }
@@ -1877,10 +1937,10 @@ fn truncate_str(s: &str, max: usize) -> String {
 }
 
 fn parse_file_line(s: &str) -> (Option<String>, u32) {
-    if let Some((file, line_str)) = s.rsplit_once(':') {
-        if let Ok(line) = line_str.parse::<u32>() {
-            return (Some(file.to_string()), line);
-        }
+    if let Some((file, line_str)) = s.rsplit_once(':')
+        && let Ok(line) = line_str.parse::<u32>()
+    {
+        return (Some(file.to_string()), line);
     }
     (None, 0)
 }

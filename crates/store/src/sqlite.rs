@@ -4,9 +4,9 @@ use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 use engram_core::{
-    classify_query_type, decay_score_with_lifecycle, Attachment, Edge, EngramError,
-    KnowledgeCapsule, LifecycleState, Observation, ObservationType, ProvenanceSource, QueryTarget,
-    RelationType, Scope, Session,
+    Attachment, Edge, EngramError, KnowledgeCapsule, LifecycleState, Observation, ObservationType,
+    ProvenanceSource, QueryTarget, RelationType, Scope, Session, classify_query_type,
+    decay_score_with_lifecycle,
 };
 use rusqlite::OptionalExtension;
 use tracing::info;
@@ -253,7 +253,7 @@ impl Storage for SqliteStore {
 
         // Classify and populate episodic/semantic tables
         drop(conn); // Release lock before reentrant call
-        let _ = self.classify_and_insert_memory(id, params);
+        self.classify_and_insert_memory(id, params);
 
         Ok(id)
     }
@@ -1577,7 +1577,7 @@ impl Storage for SqliteStore {
 
 impl SqliteStore {
     /// Re-rank search results: pinned first, then by decay score with lifecycle.
-    fn rerank_by_relevance(results: &mut Vec<Observation>) {
+    fn rerank_by_relevance(results: &mut [Observation]) {
         results.sort_by(|a, b| {
             // Pinned always first
             match (a.pinned, b.pinned) {

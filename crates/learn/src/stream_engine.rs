@@ -186,19 +186,19 @@ impl MemoryStream {
             }
 
             // File paths: contains . and common extensions
-            if let Some(ext) = word.rsplit('.').next() {
-                if matches!(
+            if let Some(ext) = word.rsplit('.').next()
+                && matches!(
                     ext,
                     "rs" | "ts" | "js" | "go" | "py" | "toml" | "json" | "yaml" | "yml" | "md"
-                ) && seen.insert(word.to_lowercase())
-                {
-                    entities.push(ExtractedEntity {
-                        name: word.to_string(),
-                        entity_type: "file".into(),
-                        confidence: 0.9,
-                    });
-                    continue;
-                }
+                )
+                && seen.insert(word.to_lowercase())
+            {
+                entities.push(ExtractedEntity {
+                    name: word.to_string(),
+                    entity_type: "file".into(),
+                    confidence: 0.9,
+                });
+                continue;
             }
 
             // Module paths: contains ::
@@ -212,7 +212,7 @@ impl MemoryStream {
             }
 
             // PascalCase: starts with uppercase, contains lowercase
-            let starts_upper = word.chars().next().map_or(false, |c| c.is_uppercase());
+            let starts_upper = word.chars().next().is_some_and(|c| c.is_uppercase());
             let has_lower = word.chars().any(|c| c.is_lowercase());
             let has_upper_inner = word.chars().skip(1).any(|c| c.is_uppercase());
             if starts_upper && has_lower && (has_upper_inner || word.len() > 5) {
@@ -404,17 +404,23 @@ mod tests {
         let entities = MemoryStream::extract_entities(text);
 
         // Should find file
-        assert!(entities
-            .iter()
-            .any(|e| e.name == "src/auth.rs" && e.entity_type == "file"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.name == "src/auth.rs" && e.entity_type == "file")
+        );
         // Should find class
-        assert!(entities
-            .iter()
-            .any(|e| e.name == "TokenValidator" && e.entity_type == "class"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.name == "TokenValidator" && e.entity_type == "class")
+        );
         // Should find function
-        assert!(entities
-            .iter()
-            .any(|e| e.name == "validate_token" && e.entity_type == "function"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.name == "validate_token" && e.entity_type == "function")
+        );
     }
 
     #[test]

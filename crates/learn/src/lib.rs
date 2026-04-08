@@ -17,5 +17,5 @@ pub use consolidation::{ConsolidationEngine, ConsolidationResult};
 pub use graph_evolver::{EvolutionResult, GraphEvolver, NewEdge};
 pub use salience_infer::infer_salience;
 pub use smart_injector::{InjectionContext, SmartInjector};
-pub use spaced_review::{bootstrap_reviews, ReviewResult, SpacedRepetition};
+pub use spaced_review::{ReviewResult, SpacedRepetition, bootstrap_reviews};
 pub use stream_engine::MemoryStream;

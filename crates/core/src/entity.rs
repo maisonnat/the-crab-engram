@@ -153,9 +153,11 @@ mod tests {
     #[test]
     fn extract_pascal_case() {
         let entities = extract_entities("Using TextEmbedding from fastembed");
-        assert!(entities
-            .iter()
-            .any(|(name, _)| name.contains("TextEmbedding")));
+        assert!(
+            entities
+                .iter()
+                .any(|(name, _)| name.contains("TextEmbedding"))
+        );
     }
 
     #[test]

@@ -1,9 +1,9 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
+use flate2::Compression;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
-use flate2::Compression;
 use sha2::{Digest, Sha256};
 
 use engram_core::EngramError;

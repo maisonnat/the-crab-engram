@@ -2,9 +2,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Memory type — separates episodic (what happened) from semantic (what is known).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MemoryType {
+    #[default]
     Episodic,
     Semantic,
 }
@@ -32,12 +33,6 @@ impl std::str::FromStr for MemoryType {
     }
 }
 
-impl Default for MemoryType {
-    fn default() -> Self {
-        Self::Episodic
-    }
-}
-
 /// Episodic memory — rich temporal context about what happened.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpisodicMemory {
@@ -52,23 +47,12 @@ pub struct EpisodicMemory {
 }
 
 /// Context for an episodic memory.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EpisodicContext {
     pub where_: Vec<String>,
     pub why: String,
     pub with_whom: Option<String>,
     pub files_before: Option<String>, // git hash reference, not diff inline
-}
-
-impl Default for EpisodicContext {
-    fn default() -> Self {
-        Self {
-            where_: Vec::new(),
-            why: String::new(),
-            with_whom: None,
-            files_before: None,
-        }
-    }
 }
 
 /// Semantic memory — dense, general knowledge.

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
@@ -24,8 +24,16 @@ pub struct AppState {
 /// Create the API router.
 pub fn create_router(state: AppState) -> Router {
     Router::new()
-        .route("/observations", get(search_observations).post(create_observation))
-        .route("/observations/:id", get(get_observation).put(update_observation).delete(delete_observation))
+        .route(
+            "/observations",
+            get(search_observations).post(create_observation),
+        )
+        .route(
+            "/observations/:id",
+            get(get_observation)
+                .put(update_observation)
+                .delete(delete_observation),
+        )
         .route("/search", post(search))
         .route("/stats", get(stats))
         .route("/sessions", post(create_session))
@@ -104,7 +112,10 @@ async fn search_observations(
 
     match state.store.search(&opts) {
         Ok(results) => Json(results).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -114,7 +125,12 @@ async fn create_observation(
 ) -> impl IntoResponse {
     let obs_type: ObservationType = match req.r#type.unwrap_or("manual".into()).parse() {
         Ok(t) => t,
-        Err(e) => return ApiError { error: e.to_string() }.into_response(),
+        Err(e) => {
+            return ApiError {
+                error: e.to_string(),
+            }
+            .into_response();
+        }
     };
     let scope: Scope = match req.scope.as_deref() {
         Some("personal") => Scope::Personal,
@@ -134,18 +150,27 @@ async fn create_observation(
 
     match state.store.insert_observation(&params) {
         Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
-async fn get_observation(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> impl IntoResponse {
+async fn get_observation(State(state): State<AppState>, Path(id): Path<i64>) -> impl IntoResponse {
     match state.store.get_observation(id) {
         Ok(Some(obs)) => Json(obs).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(ApiError { error: "not found".into() })).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(ApiError {
+                error: "not found".into(),
+            }),
+        )
+            .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -164,7 +189,10 @@ async fn update_observation(
 
     match state.store.update_observation(id, &params) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -174,7 +202,10 @@ async fn delete_observation(
 ) -> impl IntoResponse {
     match state.store.delete_observation(id, false) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -182,13 +213,18 @@ async fn search(
     State(state): State<AppState>,
     Json(query): Json<SearchQuery>,
 ) -> impl IntoResponse {
-    search_observations(State(state), Query(query)).await.into_response()
+    search_observations(State(state), Query(query))
+        .await
+        .into_response()
 }
 
 async fn stats(State(state): State<AppState>) -> impl IntoResponse {
     match state.store.get_stats(&state.project) {
         Ok(stats) => Json(stats).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -198,19 +234,32 @@ async fn create_session(
 ) -> impl IntoResponse {
     let project = req.project.unwrap_or_else(|| state.project.clone());
     match state.store.create_session(&project) {
-        Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "session_id": id }))).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Ok(id) => (
+            StatusCode::CREATED,
+            Json(serde_json::json!({ "session_id": id })),
+        )
+            .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
-async fn get_session(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> impl IntoResponse {
+async fn get_session(State(state): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
     match state.store.get_session(&id) {
         Ok(Some(session)) => Json(session).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(ApiError { error: "not found".into() })).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(ApiError {
+                error: "not found".into(),
+            }),
+        )
+            .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -221,14 +270,20 @@ async fn context(
     let limit = params.limit.unwrap_or(10);
     match state.store.get_session_context(&state.project, limit) {
         Ok(ctx) => Json(ctx).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
 async fn export(State(state): State<AppState>) -> impl IntoResponse {
     match state.store.export(Some(&state.project)) {
         Ok(data) => Json(data).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -238,7 +293,10 @@ async fn import(
 ) -> impl IntoResponse {
     match state.store.import(&data) {
         Ok(result) => Json(result).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -247,7 +305,10 @@ async fn import(
 async fn list_capsules(State(state): State<AppState>) -> impl IntoResponse {
     match state.store.list_capsules(None) {
         Ok(capsules) => Json(capsules).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -257,8 +318,17 @@ async fn get_capsule(
 ) -> impl IntoResponse {
     match state.store.get_capsule(&topic, Some(&state.project)) {
         Ok(Some(capsule)) => Json(capsule).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(ApiError { error: "not found".into() })).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(ApiError {
+                error: "not found".into(),
+            }),
+        )
+            .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -271,18 +341,22 @@ async fn consolidate(State(state): State<AppState>) -> impl IntoResponse {
             "obsolete_marked": result.obsolete_marked,
             "conflicts_found": result.conflicts_found,
             "patterns_extracted": result.patterns_extracted,
-        })).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        }))
+        .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
-async fn graph_edges(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> impl IntoResponse {
+async fn graph_edges(State(state): State<AppState>, Path(id): Path<i64>) -> impl IntoResponse {
     match state.store.get_edges(id) {
         Ok(edges) => Json(edges).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -305,8 +379,12 @@ async fn inject(
             "knowledge_boundaries": ctx.knowledge_boundaries,
             "total_tokens": ctx.total_tokens,
             "markdown": ctx.to_markdown(),
-        })).into_response(),
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        }))
+        .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -314,16 +392,24 @@ async fn antipatterns(State(state): State<AppState>) -> impl IntoResponse {
     let detector = AntiPatternDetector::new(state.store.clone(), None);
     match detector.detect_all(&state.project) {
         Ok(patterns) => {
-            let items: Vec<_> = patterns.iter().map(|p| serde_json::json!({
-                "type": format!("{:?}", p.r#type),
-                "severity": format!("{}", p.severity),
-                "description": p.description,
-                "suggestion": p.suggestion,
-                "evidence_count": p.evidence.len(),
-            })).collect();
+            let items: Vec<_> = patterns
+                .iter()
+                .map(|p| {
+                    serde_json::json!({
+                        "type": format!("{:?}", p.r#type),
+                        "severity": format!("{}", p.severity),
+                        "description": p.description,
+                        "suggestion": p.suggestion,
+                        "evidence_count": p.evidence.len(),
+                    })
+                })
+                .collect();
             Json(items).into_response()
-        },
-        Err(e) => ApiError { error: e.to_string() }.into_response(),
+        }
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
     }
 }
 
@@ -333,7 +419,9 @@ mod tests {
 
     #[test]
     fn api_error_is_serializable() {
-        let err = ApiError { error: "test error".into() };
+        let err = ApiError {
+            error: "test error".into(),
+        };
         let json = serde_json::to_string(&err).unwrap();
         assert!(json.contains("test error"));
     }

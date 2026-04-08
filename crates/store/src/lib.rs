@@ -4,8 +4,8 @@ pub mod sqlite;
 pub mod r#trait;
 
 pub use params::*;
+pub use sqlite::SqliteStore;
 pub use r#trait::{
     ExportData, ExportedPrompt, ImportResult, ProjectStats, Result, SessionContext, Storage,
     TimelineEntry, TimelinePosition,
 };
-pub use sqlite::SqliteStore;

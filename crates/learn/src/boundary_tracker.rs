@@ -81,7 +81,7 @@ impl BoundaryTracker {
                         || b.domain.to_lowercase().contains(
                             &f_lower
                                 .split('/')
-                                .last()
+                                .next_back()
                                 .unwrap_or("")
                                 .replace(".rs", "")
                                 .replace(".ts", "")

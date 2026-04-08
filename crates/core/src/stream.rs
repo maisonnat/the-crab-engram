@@ -323,7 +323,7 @@ mod tests {
         assert!(throttle.should_send(&e1));
         assert!(throttle.should_send(&e2));
         assert!(throttle.should_send(&e3)); // e1 evicted, e3 is new
-                                            // But e1 is now evicted from window, so it can be sent again
+        // But e1 is now evicted from window, so it can be sent again
         assert!(throttle.should_send(&e1));
     }
 

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use engram_core::{compaction::determine_level, ConfidenceLevel, EngramError, Observation};
+use engram_core::{ConfidenceLevel, EngramError, Observation, compaction::determine_level};
 use engram_store::{SearchOptions, Storage};
 
 /// Context built for injection into agent sessions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct InjectionContext {
     pub relevant_memories: Vec<Observation>,
     pub knowledge_capsules: Vec<String>, // Formatted capsule summaries
@@ -12,19 +12,6 @@ pub struct InjectionContext {
     pub knowledge_boundaries: Vec<String>, // Domain confidence
     pub review_reminders: Vec<String>,   // Spaced repetition pending
     pub total_tokens: usize,
-}
-
-impl Default for InjectionContext {
-    fn default() -> Self {
-        Self {
-            relevant_memories: Vec::new(),
-            knowledge_capsules: Vec::new(),
-            warnings: Vec::new(),
-            knowledge_boundaries: Vec::new(),
-            review_reminders: Vec::new(),
-            total_tokens: 0,
-        }
-    }
 }
 
 impl InjectionContext {
@@ -177,10 +164,10 @@ impl SmartInjector {
         let mut domain_counts: std::collections::HashMap<String, usize> =
             std::collections::HashMap::new();
         for obs in &all_obs {
-            if let Some(key) = &obs.topic_key {
-                if let Some(domain) = key.split('/').next() {
-                    *domain_counts.entry(domain.to_string()).or_insert(0) += 1;
-                }
+            if let Some(key) = &obs.topic_key
+                && let Some(domain) = key.split('/').next()
+            {
+                *domain_counts.entry(domain.to_string()).or_insert(0) += 1;
             }
         }
         for (domain, count) in &domain_counts {

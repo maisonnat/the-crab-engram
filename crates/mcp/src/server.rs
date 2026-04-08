@@ -65,8 +65,14 @@ impl EngramServer {
 
         use rmcp::ServiceExt;
         let transport = rmcp::transport::io::stdio();
-        let running = self.serve(transport).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
-        running.waiting().await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        let running = self
+            .serve(transport)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        running
+            .waiting()
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
         Ok(())
     }
 
@@ -76,7 +82,7 @@ impl EngramServer {
         let project = self.config.project.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(
-                tokio::time::Duration::from_secs(30 * 60) // 30 minutes
+                tokio::time::Duration::from_secs(30 * 60), // 30 minutes
             );
             loop {
                 interval.tick().await;
@@ -127,13 +133,10 @@ impl EngramServer {
         peer: &Peer<RoleServer>,
         event: &MemoryEvent,
     ) -> Result<(), String> {
-        let params = serde_json::to_value(event)
-            .map_err(|e| format!("failed to serialize event: {e}"))?;
+        let params =
+            serde_json::to_value(event).map_err(|e| format!("failed to serialize event: {e}"))?;
 
-        let notification = CustomNotification::new(
-            "notifications/stream/event",
-            Some(params),
-        );
+        let notification = CustomNotification::new("notifications/stream/event", Some(params));
 
         peer.send_notification(ServerNotification::CustomNotification(notification))
             .await
@@ -144,10 +147,7 @@ impl EngramServer {
     ///
     /// Listens on the mpsc channel, applies throttling (25ms min interval)
     /// and anti-spam (content hash dedup), then sends MCP notifications.
-    fn start_delivery_task(
-        peer: Peer<RoleServer>,
-        mut rx: mpsc::Receiver<MemoryEvent>,
-    ) {
+    fn start_delivery_task(peer: Peer<RoleServer>, mut rx: mpsc::Receiver<MemoryEvent>) {
         tokio::spawn(async move {
             let mut throttle = NotificationThrottle::new(25, 20);
 
@@ -260,36 +260,45 @@ impl ServerHandler for EngramServer {
         let project = &self.config.project;
         Ok(ListResourcesResult {
             resources: vec![
-                Annotated::new(RawResource {
-                    uri: format!("engram://{project}/current-context"),
-                    name: "Current Context".into(),
-                    title: Some("Session Context".into()),
-                    description: Some("Recent observations from current session".into()),
-                    mime_type: Some("text/markdown".into()),
-                    size: None,
-                    icons: None,
-                    meta: None,
-                }, None),
-                Annotated::new(RawResource {
-                    uri: format!("engram://{project}/knowledge-capsules"),
-                    name: "Knowledge Capsules".into(),
-                    title: Some("Capsules".into()),
-                    description: Some("Synthesized knowledge by topic".into()),
-                    mime_type: Some("text/markdown".into()),
-                    size: None,
-                    icons: None,
-                    meta: None,
-                }, None),
-                Annotated::new(RawResource {
-                    uri: format!("engram://{project}/anti-patterns"),
-                    name: "Anti-Patterns".into(),
-                    title: Some("Anti-Patterns".into()),
-                    description: Some("Active anti-pattern warnings".into()),
-                    mime_type: Some("text/markdown".into()),
-                    size: None,
-                    icons: None,
-                    meta: None,
-                }, None),
+                Annotated::new(
+                    RawResource {
+                        uri: format!("engram://{project}/current-context"),
+                        name: "Current Context".into(),
+                        title: Some("Session Context".into()),
+                        description: Some("Recent observations from current session".into()),
+                        mime_type: Some("text/markdown".into()),
+                        size: None,
+                        icons: None,
+                        meta: None,
+                    },
+                    None,
+                ),
+                Annotated::new(
+                    RawResource {
+                        uri: format!("engram://{project}/knowledge-capsules"),
+                        name: "Knowledge Capsules".into(),
+                        title: Some("Capsules".into()),
+                        description: Some("Synthesized knowledge by topic".into()),
+                        mime_type: Some("text/markdown".into()),
+                        size: None,
+                        icons: None,
+                        meta: None,
+                    },
+                    None,
+                ),
+                Annotated::new(
+                    RawResource {
+                        uri: format!("engram://{project}/anti-patterns"),
+                        name: "Anti-Patterns".into(),
+                        title: Some("Anti-Patterns".into()),
+                        description: Some("Active anti-pattern warnings".into()),
+                        mime_type: Some("text/markdown".into()),
+                        size: None,
+                        icons: None,
+                        meta: None,
+                    },
+                    None,
+                ),
             ],
             next_cursor: None,
             meta: None,
@@ -311,7 +320,9 @@ impl ServerHandler for EngramServer {
                     for obs in &ctx.observations {
                         md.push_str(&format!(
                             "- **#{}** [{}] {} — {}\n",
-                            obs.id, obs.r#type, obs.title,
+                            obs.id,
+                            obs.r#type,
+                            obs.title,
                             obs.content.chars().take(100).collect::<String>()
                         ));
                     }
@@ -326,7 +337,9 @@ impl ServerHandler for EngramServer {
                     for cap in &capsules {
                         md.push_str(&format!(
                             "- **{}** (confidence: {:.0}%, v{}) — {}\n",
-                            cap.topic, cap.confidence * 100.0, cap.version,
+                            cap.topic,
+                            cap.confidence * 100.0,
+                            cap.version,
                             cap.summary.chars().take(80).collect::<String>()
                         ));
                     }
@@ -335,15 +348,19 @@ impl ServerHandler for EngramServer {
                 Err(e) => format!("Error: {e}"),
             }
         } else if uri.ends_with("/anti-patterns") {
-            let bugfixes = self.store.search(&engram_store::SearchOptions {
-                query: String::new(),
-                project: Some(project.clone()),
-                r#type: Some(engram_core::ObservationType::Bugfix),
-                limit: Some(200),
-                ..Default::default()
-            }).unwrap_or_default();
+            let bugfixes = self
+                .store
+                .search(&engram_store::SearchOptions {
+                    query: String::new(),
+                    project: Some(project.clone()),
+                    r#type: Some(engram_core::ObservationType::Bugfix),
+                    limit: Some(200),
+                    ..Default::default()
+                })
+                .unwrap_or_default();
 
-            let mut file_hits: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            let mut file_hits: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
             for bug in &bugfixes {
                 for word in format!("{} {}", bug.title, bug.content).split_whitespace() {
                     if word.contains(".rs") || word.contains(".ts") || word.contains(".go") {
@@ -368,8 +385,9 @@ impl ServerHandler for EngramServer {
             ));
         };
 
-        Ok(ReadResourceResult::new(vec![
-            ResourceContents::text(content, uri.clone()),
-        ]))
+        Ok(ReadResourceResult::new(vec![ResourceContents::text(
+            content,
+            uri.clone(),
+        )]))
     }
 }

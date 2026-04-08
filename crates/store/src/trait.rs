@@ -262,6 +262,7 @@ pub trait Storage: Send + Sync {
     ) -> Result<i64>;
 
     /// Get beliefs by subject.
+    #[allow(clippy::type_complexity)]
     fn get_beliefs(&self, subject: &str) -> Result<Vec<(String, String, String, f64, String)>>;
 
     // ── Entities (F2.5.12) ────────────────────────────────────────
@@ -288,6 +289,7 @@ pub trait Storage: Send + Sync {
     ) -> Result<i64>;
 
     /// Get transfers for a target project.
+    #[allow(clippy::type_complexity)]
     fn get_transfers(&self, target: &str) -> Result<Vec<(i64, String, Option<i64>, f64, bool)>>;
 
     /// Accept a transfer.

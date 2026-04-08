@@ -119,13 +119,14 @@ pub struct Observation {
 }
 
 /// How an observation was verified.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProvenanceSource {
     TestVerified,
     CodeAnalysis,
     UserStated,
     External,
+    #[default]
     LlmReasoning,
     Inferred,
 }
@@ -161,16 +162,11 @@ impl std::str::FromStr for ProvenanceSource {
     }
 }
 
-impl Default for ProvenanceSource {
-    fn default() -> Self {
-        Self::LlmReasoning
-    }
-}
-
 /// Observation lifecycle state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LifecycleState {
+    #[default]
     Active,
     Stale,
     Archived,
@@ -190,12 +186,6 @@ impl std::str::FromStr for LifecycleState {
                 "invalid lifecycle state: {s}"
             ))),
         }
-    }
-}
-
-impl Default for LifecycleState {
-    fn default() -> Self {
-        Self::Active
     }
 }
 

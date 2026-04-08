@@ -103,7 +103,7 @@ impl ConsolidationEngine {
         }
 
         let mut merged = 0u32;
-        for (_, group) in &hash_groups {
+        for group in hash_groups.values() {
             if group.len() > 1 {
                 // Keep the newest (highest id), soft-delete others
                 let newest = group.iter().max_by_key(|o| o.id).unwrap();

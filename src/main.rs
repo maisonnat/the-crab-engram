@@ -9,7 +9,11 @@ use engram_store::{AddObservationParams, SearchOptions, SqliteStore, Storage};
 
 /// engram-rust: Persistent memory for AI coding agents
 #[derive(Parser)]
-#[command(name = "engram", version = "2.0.0", about = "Persistent memory for AI agents")]
+#[command(
+    name = "engram",
+    version = "2.0.0",
+    about = "Persistent memory for AI agents"
+)]
 struct Cli {
     /// Path to the engram database
     #[arg(long, global = true)]
@@ -293,10 +297,7 @@ async fn main() -> Result<()> {
             let store = open_store(cli.db)?;
             let ctx = store.get_session_context(&cli.project, limit)?;
 
-            println!(
-                "## Session Context for \"{}\"\n",
-                cli.project
-            );
+            println!("## Session Context for \"{}\"\n", cli.project);
             println!(
                 "Session: {} (started {})\n",
                 &ctx.session.id[..8],
@@ -362,7 +363,11 @@ async fn main() -> Result<()> {
 
         Commands::Export { output, all } => {
             let store = open_store(cli.db)?;
-            let project = if all { None } else { Some(cli.project.as_str()) };
+            let project = if all {
+                None
+            } else {
+                Some(cli.project.as_str())
+            };
             let data = store.export(project)?;
             let json = serde_json::to_string_pretty(&data)?;
 
@@ -387,10 +392,7 @@ async fn main() -> Result<()> {
             println!("  - {} duplicates skipped", result.duplicates_skipped);
         }
 
-        Commands::ExportContext {
-            max_tokens,
-            output,
-        } => {
+        Commands::ExportContext { max_tokens, output } => {
             let store = open_store(cli.db)?;
             let context = build_export_context(&store, &cli.project, max_tokens)?;
 
@@ -409,7 +411,10 @@ async fn main() -> Result<()> {
             println!("{id}");
         }
 
-        Commands::SessionEnd { session_id, summary } => {
+        Commands::SessionEnd {
+            session_id,
+            summary,
+        } => {
             let store = open_store(cli.db)?;
             store.end_session(&session_id, summary.as_deref())?;
             println!("Session {} ended.", &session_id[..8]);
@@ -451,11 +456,15 @@ async fn main() -> Result<()> {
             })?;
 
             let mut duplicates = 0u32;
-            let mut hash_map: std::collections::HashMap<String, Vec<_>> = std::collections::HashMap::new();
+            let mut hash_map: std::collections::HashMap<String, Vec<_>> =
+                std::collections::HashMap::new();
             for obs in &observations {
-                hash_map.entry(obs.normalized_hash.clone()).or_default().push(obs);
+                hash_map
+                    .entry(obs.normalized_hash.clone())
+                    .or_default()
+                    .push(obs);
             }
-            for (_, group) in &hash_map {
+            for group in hash_map.values() {
                 if group.len() > 1 {
                     let newest = group.iter().max_by_key(|o| o.id).unwrap();
                     for obs in group {
@@ -491,9 +500,16 @@ async fn main() -> Result<()> {
                 SyncAction::Export => {
                     let dir = dir.unwrap_or_else(|| PathBuf::from("./engram-chunks"));
                     let manifest = engram_sync::export_chunks(&store, Some(&cli.project), &dir)?;
-                    println!("✅ Exported {} chunk(s) to {}", manifest.chunks.len(), dir.display());
+                    println!(
+                        "✅ Exported {} chunk(s) to {}",
+                        manifest.chunks.len(),
+                        dir.display()
+                    );
                     for chunk in &manifest.chunks {
-                        println!("  - {} ({} bytes, {} observations)", chunk.filename, chunk.size, chunk.observation_count);
+                        println!(
+                            "  - {} ({} bytes, {} observations)",
+                            chunk.filename, chunk.size, chunk.observation_count
+                        );
                     }
                 }
                 SyncAction::Import => {
@@ -617,7 +633,8 @@ Use `mem_suggest_topic_key` to generate keys like:
 - `architecture/auth-jwt-flow`
 - `bug/fix-n1-query`
 - `decision/use-sqlite`
-"#.to_string()
+"#
+    .to_string()
 }
 
 /// Build export-context: Markdown system prompt from project knowledge.
@@ -651,7 +668,10 @@ fn build_export_context(store: &dyn Storage, project: &str, max_tokens: usize) -
 
     // Stats summary
     md.push_str("## 📊 Overview\n\n");
-    md.push_str(&format!("- Total observations: {}\n", stats.total_observations));
+    md.push_str(&format!(
+        "- Total observations: {}\n",
+        stats.total_observations
+    ));
     md.push_str(&format!("- Total sessions: {}\n", stats.total_sessions));
     md.push('\n');
 

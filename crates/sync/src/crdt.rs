@@ -11,6 +11,12 @@ pub struct CrdtState {
     pub last_sync: Option<DateTime<Utc>>,
 }
 
+impl Default for CrdtState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CrdtState {
     pub fn new() -> Self {
         Self {

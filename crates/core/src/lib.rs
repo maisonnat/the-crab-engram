@@ -21,14 +21,14 @@ pub use attachment::{Attachment, MultimodalObservation};
 pub use belief::{Belief, BeliefOperation, BeliefState, HistoricalBelief};
 pub use boundary::{BoundaryEvidence, ConfidenceLevel, KnowledgeBoundary};
 pub use capsule::KnowledgeCapsule;
-pub use compaction::{determine_level, CompactionLevel};
-pub use crypto::{decrypt, derive_key, encrypt, is_encrypted_file, EncryptionError};
-pub use entity::{extract_entities, Entity, EntityType};
+pub use compaction::{CompactionLevel, determine_level};
+pub use crypto::{EncryptionError, decrypt, derive_key, encrypt, is_encrypted_file};
+pub use entity::{Entity, EntityType, extract_entities};
 pub use error::EngramError;
 pub use graph::{Edge, RelationType};
 pub use lifecycle::LifecyclePolicy;
 pub use memory::{
-    classify_query_type, EpisodicContext, EpisodicMemory, MemoryType, QueryTarget, SemanticMemory,
+    EpisodicContext, EpisodicMemory, MemoryType, QueryTarget, SemanticMemory, classify_query_type,
 };
 pub use observation::{LifecycleState, Observation, ObservationType, ProvenanceSource, Scope};
 pub use permissions::{AccessLevel, PermissionEngine, PermissionRule};
