@@ -156,23 +156,33 @@ Default level: `warn`.
 
 ## Agent Setup
 
+### Automatic (Claude Code, Cursor, Gemini CLI)
+
 Engram can auto-configure itself for popular AI agents:
 
 ```bash
-# Claude Code
 engram setup claude-code   # → ~/.claude/skills/engram-memory.md
-
-# Cursor
 engram setup cursor         # → ~/.cursor/rules/engram-memory.md
-
-# Gemini CLI
 engram setup gemini-cli     # → ~/.gemini/extensions/engram-memory.md
-
-# Opencode
-engram setup opencode       # → ~/.config/opencode/skills/engram-memory.md
 ```
 
 Each writes a SKILL.md with instructions for the agent on how to use engram's MCP tools.
+
+### Manual (OpenCode)
+
+For OpenCode, configure in `~/.config/opencode/opencode.json`:
+
+```json
+"mcp": {
+  "engram": {
+    "command": ["the-crab-engram", "mcp"],
+    "type": "local"
+  }
+}
+```
+
+The AGENTS.md protocol is included in the project. Copy the Engram Protocol section
+into your `~/.config/opencode/AGENTS.md` to enable proactive memory capture.
 
 ## Project Structure (Runtime)
 
