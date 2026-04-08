@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/crab3.png" alt="The Crab Engram" width="200">
+
 # 🦀 The Crab Engram
 
 **Persistent memory for AI coding agents — rewritten in Rust.**
