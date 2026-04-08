@@ -98,6 +98,11 @@ None - no external service configuration required.
 - .deb packaging ready for Phase 6 (packaging) expansion
 - Windows ARM64 runner configured for future Windows ARM support
 
+## Self-Check: PASSED
+
+- Created files exist: `.planning/phases/01-build-matrix/01-01-SUMMARY.md` ✓
+- Commits exist: `bbda8c2` (task commit), `73f8efa` (docs commit) ✓
+
 ---
 *Phase: 01-build-matrix*
 *Completed: 2026-04-08*
