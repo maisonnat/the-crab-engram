@@ -18,21 +18,47 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Linux x86_64 GNU
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact: the-crab-engram
-            archive: the-crab-engram-linux-x86_64.tar.gz
+            use_cross: true
+          # Linux x86_64 musl
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            use_cross: true
+          # Linux aarch64 GNU
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            use_cross: true
+          # Linux aarch64 musl
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            use_cross: true
+          # macOS x86_64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            use_cross: false
+          # macOS aarch64
           - target: aarch64-apple-darwin
             os: macos-latest
-            artifact: the-crab-engram
-            archive: the-crab-engram-macos-arm64.tar.gz
+            use_cross: false
+          # Windows x86_64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            artifact: the-crab-engram.exe
-            archive: the-crab-engram-windows-x86_64.zip
+            use_cross: false
+          # Windows aarch64
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            use_cross: false
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install cross (Linux)
+        if: matrix.use_cross
+        run: |
+          CROSS_URL="https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-musl.tar.gz"
+          curl -sSL "$CROSS_URL" | tar xz -C /usr/local/bin
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -50,30 +76,66 @@ jobs:
             target/
           key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release
+      - name: Build release (cross)
+        if: matrix.use_cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build release (cargo)
+        if: "!matrix.use_cross"
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../${{ matrix.archive }} ${{ matrix.artifact }}
+          tar czf ../../../the-crab-engram-${{ github.ref_name }}-${{ matrix.target }}.tar.gz the-crab-engram
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path "target/${{ matrix.target }}/release/${{ matrix.artifact }}" -DestinationPath "${{ matrix.archive }}"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/the-crab-engram.exe" -DestinationPath "the-crab-engram-${{ github.ref_name }}-${{ matrix.target }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}
-          path: ${{ matrix.archive }}
+          name: archive-${{ matrix.target }}
+          path: |
+            *.tar.gz
+            *.zip
+
+  build-release-deb:
+    name: Build .deb package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Build .deb
+        run: cargo deb --target x86_64-unknown-linux-gnu
+
+      - name: Rename .deb with version
+        run: |
+          cd target/x86_64-unknown-linux-gnu/debian
+          DEB_FILE=$(ls *.deb | head -1)
+          mv "$DEB_FILE" "the-crab-engram-${{ github.ref_name }}-x86_64-unknown-linux-gnu.deb"
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: target/x86_64-unknown-linux-gnu/debian/*.deb
 
   release:
     name: Create Release
-    needs: build
+    needs: [build, build-release-deb]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +160,7 @@ jobs:
 
       - name: Generate checksums
         run: |
-          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; > checksums-sha256.txt || true
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" \) -exec sha256sum {} \; > checksums-sha256.txt || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -110,6 +172,7 @@ jobs:
           files: |
             artifacts/**/*.tar.gz
             artifacts/**/*.zip
+            artifacts/**/*.deb
             checksums-sha256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
