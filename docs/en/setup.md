@@ -13,8 +13,8 @@
 
 ```bash
 # Clone
-git clone https://github.com/Gentleman-Programming/engram-rust
-cd engram-rust
+git clone https://github.com/maisonnat/the-crab-engram.git
+cd the-crab-engram
 
 # Debug build
 cargo build

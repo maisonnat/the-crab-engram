@@ -9,7 +9,7 @@
 [![Tests](https://img.shields.io/badge/Tests-199%20passing-brightgreen)]()
 [![Warnings](https://img.shields.io/badge/Warnings-0-brightgreen)]()
 
-*A Rust port of [engram](https://github.com/Gentleman-Programming/engram) with 7 auto-learning engines, encryption, multi-agent permissions, and graph-based knowledge.*
+*A Rust rewrite of [engram](https://github.com/Gentleman-Programming/engram) with 7 auto-learning engines, encryption, multi-agent permissions, and graph-based knowledge.*
 
 [Features](#features) • [Quick Start](#quick-start) • [Architecture](#architecture) • [MCP Tools](#mcp-tools) • [API](#api) • [Docs](docs/en/overview.md)
 
@@ -94,7 +94,7 @@ The Crab Engram (single Rust binary)
 
 ```bash
 # Build
-git clone https://github.com/Gentleman-Programming/the-crab-engram.git
+git clone https://github.com/maisonnat/the-crab-engram.git
 cd the-crab-engram
 cargo build --release
 
@@ -293,14 +293,17 @@ cargo clippy --workspace
 
 ## License
 
-[MIT](LICENSE) — Built with 🦀 by [Gentleman Programming](https://github.com/Gentleman-Programming)
+[MIT](LICENSE) — Built with 🦀
 
 ---
 
 <div align="center">
 
-**[engram (Go)](https://github.com/Gentleman-Programming/engram)** • **The Crab Engram (Rust)** 🦀
+## Acknowledgments
 
-*The original gave your agent a memory. The Crab gives it a brain.*
+Inspired by [engram](https://github.com/Gentleman-Programming/engram) — the original Go implementation that proved persistent memory for AI agents works.
+Thanks to the Gentleman Programming community for the ideas, architecture patterns, and the vision of giving AI agents a brain.
+
+🦀
 
 </div>
