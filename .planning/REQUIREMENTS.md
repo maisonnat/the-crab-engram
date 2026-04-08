@@ -112,17 +112,60 @@
 
 ## Traceability
 
-| Requirement | Phase | Research Source |
-|-------------|-------|-----------------|
-| UPDATE-01..06 | Self-Update Engine | FEATURES.md T1, ADR-001 |
-| BUILD-01..07 | Expanded Build Matrix | FEATURES.md T6, ADR-002/006/007 |
-| VERSION-01..03 | Version Transparency | FEATURES.md T3 |
-| BACKUP-01..15 | Backup & Restore System | FEATURES.md D1/D2/D4/D5, ADR-010..014 |
-| PKG-01..04 | Debian/RPM Packaging | FEATURES.md T4, ADR-004 |
-| HOMEBREW-01..04 | Homebrew Tap | FEATURES.md T2, ADR-003 |
-| WIN-01..06 | Windows Distribution | FEATURES.md T5, ADR-005/008/009 |
-| INSTALL-01..03 | Install Scripts | FEATURES.md T2 |
-| BG-01..04 | Background Update Check | FEATURES.md D3 |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| BUILD-01 | Phase 1: Build Matrix | Pending |
+| BUILD-02 | Phase 1: Build Matrix | Pending |
+| BUILD-03 | Phase 1: Build Matrix | Pending |
+| BUILD-04 | Phase 1: Build Matrix | Pending |
+| BUILD-05 | Phase 1: Build Matrix | Pending |
+| BUILD-06 | Phase 1: Build Matrix | Pending |
+| BUILD-07 | Phase 1: Build Matrix | Pending |
+| UPDATE-01 | Phase 2: Self-Update Engine | Pending |
+| UPDATE-02 | Phase 2: Self-Update Engine | Pending |
+| UPDATE-03 | Phase 2: Self-Update Engine | Pending |
+| UPDATE-04 | Phase 2: Self-Update Engine | Pending |
+| UPDATE-05 | Phase 2: Self-Update Engine | Pending |
+| UPDATE-06 | Phase 2: Self-Update Engine | Pending |
+| VERSION-01 | Phase 3: Version Transparency | Pending |
+| VERSION-02 | Phase 3: Version Transparency | Pending |
+| VERSION-03 | Phase 3: Version Transparency | Pending |
+| BACKUP-01 | Phase 4: Backup Core | Pending |
+| BACKUP-02 | Phase 4: Backup Core | Pending |
+| BACKUP-06 | Phase 4: Backup Core | Pending |
+| BACKUP-12 | Phase 4: Backup Core | Pending |
+| BACKUP-13 | Phase 4: Backup Core | Pending |
+| BACKUP-14 | Phase 4: Backup Core | Pending |
+| BACKUP-15 | Phase 4: Backup Core | Pending |
+| BACKUP-03 | Phase 5: Restore & Auto-Backup | Pending |
+| BACKUP-04 | Phase 5: Restore & Auto-Backup | Pending |
+| BACKUP-05 | Phase 5: Restore & Auto-Backup | Pending |
+| BACKUP-07 | Phase 5: Restore & Auto-Backup | Pending |
+| BACKUP-08 | Phase 5: Restore & Auto-Backup | Pending |
+| BACKUP-09 | Phase 5: Restore & Auto-Backup | Pending |
+| BACKUP-10 | Phase 5: Restore & Auto-Backup | Pending |
+| BACKUP-11 | Phase 5: Restore & Auto-Backup | Pending |
+| PKG-01 | Phase 6: Packaging | Pending |
+| PKG-02 | Phase 6: Packaging | Pending |
+| PKG-03 | Phase 6: Packaging | Pending |
+| PKG-04 | Phase 6: Packaging | Pending |
+| HOMEBREW-01 | Phase 6: Packaging | Pending |
+| HOMEBREW-02 | Phase 6: Packaging | Pending |
+| HOMEBREW-03 | Phase 6: Packaging | Pending |
+| HOMEBREW-04 | Phase 6: Packaging | Pending |
+| WIN-01 | Phase 6: Packaging | Pending |
+| WIN-02 | Phase 6: Packaging | Pending |
+| WIN-03 | Phase 6: Packaging | Pending |
+| WIN-04 | Phase 6: Packaging | Pending |
+| WIN-05 | Phase 6: Packaging | Pending |
+| WIN-06 | Phase 6: Packaging | Pending |
+| INSTALL-01 | Phase 7: Install Scripts | Pending |
+| INSTALL-02 | Phase 7: Install Scripts | Pending |
+| INSTALL-03 | Phase 7: Install Scripts | Pending |
+| BG-01 | Phase 8: Background Update Check | Pending |
+| BG-02 | Phase 8: Background Update Check | Pending |
+| BG-03 | Phase 8: Background Update Check | Pending |
+| BG-04 | Phase 8: Background Update Check | Pending |
 
 ---
 
