@@ -87,39 +87,22 @@ jobs:
         with:
           path: artifacts
 
-      - name: Generate release notes from changelog
-        id: notes
+      - name: Generate release notes
         run: |
           VERSION="${GITHUB_REF_NAME}"
           CHANGELOG="docs/en/changelog.md"
-
+          NOTES="Release ${VERSION}"
           if [ -f "$CHANGELOG" ]; then
-            # Extract notes for this version (between ## vX.Y.Z and the next ##)
-            NOTES=$(awk "/^## ${VERSION}/,/^## /" "$CHANGELOG" | head -n -1)
-
-            if [ -z "$NOTES" ]; then
-              # Try without 'v' prefix
-              VERSION_CLEAN="${VERSION#v}"
-              NOTES=$(awk "/^## ${VERSION_CLEAN}/,/^## /" "$CHANGELOG" | head -n -1)
+            EXTRACTED=$(awk "/^## ${VERSION}/{found=1;next} /^## /{if(found)exit} found" "$CHANGELOG" 2>/dev/null || true)
+            if [ -n "$EXTRACTED" ]; then
+              NOTES="$EXTRACTED"
             fi
-
-            if [ -z "$NOTES" ]; then
-              NOTES="Release ${VERSION}
-
-See [changelog](docs/en/changelog.md) for details."
-            fi
-          else
-            NOTES="Release ${VERSION}"
           fi
-
-          # Write to file for the release body
           echo "$NOTES" > release_notes.md
 
       - name: Generate checksums
         run: |
-          cd artifacts
-          sha256sum **/*.tar.gz **/*.zip > ../checksums-sha256.txt 2>/dev/null || true
-          cd ..
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; > checksums-sha256.txt || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -127,9 +110,10 @@ See [changelog](docs/en/changelog.md) for details."
           name: "The Crab Engram ${{ github.ref_name }}"
           body_path: release_notes.md
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          prerelease: false
           files: |
-            artifacts/**/*
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
             checksums-sha256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
