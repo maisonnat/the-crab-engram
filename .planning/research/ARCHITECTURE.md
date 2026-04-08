@@ -385,7 +385,7 @@ strategy:
 
 **What people do:** Adopt `cargo-dist` + `axoupdater` for self-update, which requires replacing the entire release workflow.
 
-**Why it's wrong:** The existing release workflow works. `self_update` v0.27 works with any GitHub Release — no receipts, no special CI, no coupling. `cargo-dist` is opinionated and would force changes to artifact naming, matrix structure, and packaging.
+**Why it's wrong:** The existing release workflow works. `self_update` v0.44.0 works with any GitHub Release — no receipts, no special CI, no coupling. `cargo-dist` is opinionated and would force changes to artifact naming, matrix structure, and packaging.
 
 **Do this instead:** Use `self_update` directly. Works with the existing workflow + any future packaging.
 

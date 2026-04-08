@@ -26,7 +26,7 @@ See [STACK.md](STACK.md) for full details.
 - `cargo-generate-rpm` v0.20.0: RPM packaging — used by fd and others
 - `cross` v0.2.5: Linux ARM cross-compilation (native ARM runners for gnu, `cross` for musl)
 
-**Key version note:** PROJECT.md references `self_update` v0.27, which is 17 releases behind. Must use v0.44.0.
+**Key version note:** Master plan references `self_update` v0.27, which is 17 releases behind. Must use v0.44.0.
 
 ### Expected Features
 

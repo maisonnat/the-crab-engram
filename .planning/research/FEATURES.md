@@ -35,7 +35,7 @@ Features users expect. Missing = product feels incomplete, users consider altern
 
 | Feature | Why Expected | Complexity | Notes |
 |---|---|---|---|
-| `the-crab-engram update` | uv has it, users expect it on any data-critical tool. Manual download+replace is unacceptable for daily-use tools. | Medium | `self_update` crate v0.27, works out of the box with target-triple asset naming |
+| `the-crab-engram update` | uv has it, users expect it on any data-critical tool. Manual download+replace is unacceptable for daily-use tools. | Medium | `self_update` crate v0.44.0, works out of the box with target-triple asset naming |
 | `the-crab-engram update --check-only` | Users want to know before committing to download. uv lets you check version without upgrading. | Low | Just fetches latest release metadata, no download |
 
 **Source:** uv's `self update` sets the modern standard. Users coming from uv/gh expect this.
@@ -160,7 +160,7 @@ Features to explicitly NOT build.
 | **Backup to remote (S3/GCS)** | Scope creep. Users can script this. | Provide good backup path configuration |
 | **Semver-compliant auto-migration with rollback** | Extremely complex. Current schema is stable at v16. | Pre-migration backup + `PRAGMA integrity_check` |
 | **Changelog shown during update** | `self_update` doesn't support this natively. Users can check GitHub. | Link to release notes in update output |
-| **`cargo-dist` adoption** | Replaces entire release workflow. `self_update` achieves the same without coupling. | Use `self_update` v0.27 as planned |
+| **`cargo-dist` adoption** | Replaces entire release workflow. `self_update` achieves the same without coupling. | Use `self_update` v0.44.0 |
 | **Cross-compilation toolchain** | GitHub ARM runners went GA Jan 2026. No need for `cross`/`cargo-zigbuild`. | Native ARM runners (`ubuntu-24.04-arm`, `windows-11-arm`) |
 | **Homebrew core submission** | Too early at v2.0.0. Core has strict review criteria and slow merge cycle. | Custom tap (`maisonnat/homebrew-tap`) for velocity |
 | **Cargo install support** | Building from source requires Rust toolchain. Target audience is non-Rust users. | Document `cargo install` as unsupported/last resort |

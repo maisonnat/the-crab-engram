@@ -40,7 +40,7 @@
 | **Windows binary replace** | `self_replace` crate (proven) | Unknown | Via installer |
 | **No-openssl builds** | `default-features = false, features = ["rustls"]` | Requires native-tls override | Default OpenSSL |
 
-**The project already chose `self_update` v0.27 in PROJECT.md — that version is 17 releases behind. Use v0.44.0.**
+**The project's master plan cited `self_update` v0.27 — 17 releases behind. Use v0.44.0 (published 2026-04-05).**
 
 **Dependency configuration:**
 ```toml

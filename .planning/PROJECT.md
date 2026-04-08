@@ -76,7 +76,7 @@ The agent's brain must never be lost. All update, distribution, and packaging wo
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| `self_update` v0.27 (not `axoupdater`) | No cargo-dist coupling, works with any GitHub Release, rustls | — Pending |
+| `self_update` v0.44.0 (not `axoupdater`) | No cargo-dist coupling, works with any GitHub Release, rustls. Master plan cited v0.27 — 17 releases behind. | — Pending |
 | Native ARM runners (not cross/QEMU) | GitHub ARM runners GA since Jan 2026, faster, simpler CI | — Pending |
 | Custom Homebrew tap (not core) | Faster release velocity at v2.0.0, can migrate later | — Pending |
 | `cargo-deb` + `cargo-generate-rpm` | De facto standard (ripgrep, fd, bat use these) | — Pending |
