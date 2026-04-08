@@ -1,5 +1,23 @@
 # Engram-Rust — Changelog
 
+## v2.1.0 (2026-04-08)
+
+### Bug Fixes
+- cargo fmt import order in tui app.rs (`146d1a1`)
+- rename user-facing engram references to the-crab-engram (`60827bf`)
+- rename release artifacts to the-crab-engram (`b58da4e`)
+- rename binary to the-crab-engram (`c9a0959`)
+- schema compatibility with Go engram DB — add missing columns via ALTER TABLE (`0ee5e04`)
+- correct all tool names to match actual code (32 tools) (`5baddcb`)
+
+### Documentation
+- fix user-guide.md — remove non-existent tools, update tool names (`bf4049e`)
+- update AGENTS.md with additional tools protocol, fix setup.md for OpenCode (`4d047b3`)
+- add logo to README (`364d034`)
+
+### Other
+- chore: archive engram-v2 SDD change (`b4dee3e`)
+
 ## v2.0.0 (2026-04-08)
 
 ### Features
