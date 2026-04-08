@@ -9,11 +9,11 @@
 
 ### Self-Update
 
-- [ ] **UPDATE-01**: User can update to latest release with `the-crab-engram update`
-- [ ] **UPDATE-02**: User can check for updates without downloading with `the-crab-engram update --check-only`
+- [ ] **UPDATE-01**: User can update to latest release with `the-crab-engram self update`
+- [ ] **UPDATE-02**: User can check for updates without downloading with `the-crab-engram self update --check-only`
 - [ ] **UPDATE-03**: System verifies SHA-256 checksum of downloaded binary against `checksums-sha256.txt`
-- [ ] **UPDATE-04**: System creates automatic backup before replacing binary during update
-- [ ] **UPDATE-05**: System verifies binary size after update (catches Windows 0-byte executable bug) and rolls back on failure
+- [ ] **UPDATE-04**: User can preview update with `--dry-run` flag (shows target version without downloading)
+- [ ] **UPDATE-05**: System verifies binary size after update (catches Windows 0-byte executable bug)
 - [ ] **UPDATE-06**: Update uses `self_update` crate with `rustls` feature (no OpenSSL dependency)
 
 ### Build Matrix
