@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Wrap},
+    Frame,
 };
 
 use engram_core::Observation;
@@ -166,7 +166,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!(" engram — {} ", app.project)),
+                .title(format!(" The Crab Engram — {} ", app.project)),
         )
         .select(selected)
         .style(Style::default().fg(Color::Gray))

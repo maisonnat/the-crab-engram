@@ -89,7 +89,7 @@
 
 ### D5: Embedding Model Versioning
 
-**Decisión:** Cada embedding se almacena con `model_name` + `model_version`. Si hay mismatch, búsqueda cae a FTS5-only hasta que el usuario corra `engram reembed`.
+**Decisión:** Cada embedding se almacena con `model_name` + `model_version`. Si hay mismatch, búsqueda cae a FTS5-only hasta que el usuario corra `the-crab-engram reembed`.
 
 **Razón:** Cada modelo crea un espacio geométrico diferente. Nunca mezclar vectores de modelos diferentes. (Ref: Gary Stafford, Dic 2025).
 

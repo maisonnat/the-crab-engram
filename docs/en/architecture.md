@@ -226,10 +226,10 @@ The TUI separates state (`App`) from rendering (`draw`):
 
 | Entry Point | File | Command |
 |---|---|---|
-| CLI (all commands) | `src/main.rs` | `engram <subcommand>` |
-| MCP Server | `crates/mcp/src/server.rs` | `engram mcp --profile agent` |
-| HTTP API | `crates/api/src/lib.rs` | `engram serve --port 7437` |
-| TUI | `crates/tui/src/lib.rs` | `engram tui` |
+| CLI (all commands) | `src/main.rs` | `the-crab-engram <subcommand>` |
+| MCP Server | `crates/mcp/src/server.rs` | `the-crab-engram mcp --profile agent` |
+| HTTP API | `crates/api/src/lib.rs` | `the-crab-engram serve --port 7437` |
+| TUI | `crates/tui/src/lib.rs` | `the-crab-engram tui` |
 | Tests | `tests/integration_store.rs` + per-crate `#[cfg(test)]` | `cargo test --workspace` |
 
 ## Concurrency Model

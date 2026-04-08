@@ -1,4 +1,4 @@
-# Engram-Rust — Setup Guide
+# The Crab Engram — Setup Guide
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ cargo run -- mcp --project my-app --profile admin
 cargo run -- mcp --profile all
 ```
 
-The MCP server communicates over **stdio** (JSON-RPC). Configure your AI agent to launch `engram mcp` as its MCP server.
+The MCP server communicates over **stdio** (JSON-RPC). Configure your AI agent to launch `the-crab-engram mcp` as its MCP server.
 
 ### HTTP REST API
 
@@ -161,12 +161,12 @@ Default level: `warn`.
 Engram can auto-configure itself for popular AI agents:
 
 ```bash
-engram setup claude-code   # → ~/.claude/skills/engram-memory.md
-engram setup cursor         # → ~/.cursor/rules/engram-memory.md
-engram setup gemini-cli     # → ~/.gemini/extensions/engram-memory.md
+the-crab-engram setup claude-code   # → ~/.claude/skills/engram-memory.md
+the-crab-engram setup cursor         # → ~/.cursor/rules/engram-memory.md
+the-crab-engram setup gemini-cli     # → ~/.gemini/extensions/engram-memory.md
 ```
 
-Each writes a SKILL.md with instructions for the agent on how to use engram's MCP tools.
+Each writes a SKILL.md with instructions for the agent on how to use The Crab Engram's MCP tools.
 
 ### Manual (OpenCode)
 

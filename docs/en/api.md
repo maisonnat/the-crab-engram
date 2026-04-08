@@ -1,8 +1,8 @@
-# Engram-Rust — API Reference
+# The Crab Engram — API Reference
 
 ## HTTP REST API (14 Routes)
 
-Start with: `engram serve --port 7437`
+Start with: `the-crab-engram serve --port 7437`
 
 All routes accept/return JSON. CORS is fully permissive.
 
@@ -59,7 +59,7 @@ All routes accept/return JSON. CORS is fully permissive.
 
 ## MCP Tools (31 Tools)
 
-Start with: `engram mcp --profile agent`
+Start with: `the-crab-engram mcp --profile agent`
 
 ### Core Tools (Agent profile)
 
@@ -141,12 +141,12 @@ Start with: `engram mcp --profile agent`
 ## CLI Commands (15+)
 
 ```
-engram-rust: Persistent memory for AI agents
+The Crab Engram: Persistent memory for AI agents
 
-Usage: engram [OPTIONS] <COMMAND>
+Usage: the-crab-engram [OPTIONS] <COMMAND>
 
 Options:
-      --db <PATH>         Path to the engram database [default: ~/.engram/engram.db]
+      --db <PATH>         Path to the database [default: ~/.engram/engram.db]
       --project <NAME>    Project name [default: "default"]
 
 Commands:
@@ -166,7 +166,7 @@ Commands:
   consolidate     Run memory consolidation
   sync            Sync operations (chunk export/import, status)
   encrypt         Encrypt or decrypt the database
-  setup           Setup engram for a specific AI agent
+  setup           Setup The Crab Engram for a specific AI agent
   version         Version info
 ```
 
@@ -174,26 +174,26 @@ Commands:
 
 ```bash
 # Start MCP server for Claude Code
-engram mcp --profile agent --project my-app
+the-crab-engram mcp --profile agent --project my-app
 
 # Search for auth-related memories
-engram search "JWT auth" --limit 5
+the-crab-engram search "JWT auth" --limit 5
 
 # Save a learning
-engram save --title "Fixed N+1 query" --content "Used eager loading" --type bugfix --session-id abc-123
+the-crab-engram save --title "Fixed N+1 query" --content "Used eager loading" --type bugfix --session-id abc-123
 
 # Start HTTP API
-engram serve --port 7437
+the-crab-engram serve --port 7437
 
 # Launch TUI
-engram tui
+the-crab-engram tui
 
 # Export context as system prompt
-engram export-context --max-tokens 2000
+the-crab-engram export-context --max-tokens 2000
 
 # Encrypt database
-engram encrypt --passphrase "my-secret"
+the-crab-engram encrypt --passphrase "my-secret"
 
 # Setup for Opencode
-engram setup opencode
+the-crab-engram setup opencode
 ```

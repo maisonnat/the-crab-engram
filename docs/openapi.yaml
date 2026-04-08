@@ -1,11 +1,11 @@
 openapi: "3.0.3"
 info:
-  title: Engram-Rust HTTP API
+  title: The Crab Engram HTTP API
   description: Persistent memory for AI coding agents — REST API
   version: "2.0.0"
   license:
     name: MIT
-    url: https://github.com/Gentleman-Programming/engram-rust
+    url: https://github.com/maisonnat/the-crab-engram
 
 servers:
   - url: http://localhost:7437

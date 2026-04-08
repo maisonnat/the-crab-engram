@@ -145,7 +145,7 @@ _Objetivo: Binario que hace TODO lo que Engram Go hace, con tests._
 
 `→ F1.5`
 
-- [x] F1.7.1 — `engram setup [agent]` para claude-code, cursor, gemini-cli, opencode
+- [x] F1.7.1 — `the-crab-engram setup [agent]` para claude-code, cursor, gemini-cli, opencode
 - [x] F1.7.2 — SKILL.md template con Memory Protocol
 
 **DoD F1.7:** `engram-rust setup claude-code` configura el agente correctamente
@@ -500,7 +500,7 @@ _Objetivo: Production-ready + features de alto impacto._
 
 - [x] F3.1.1 — Setup `crates/api/Cargo.toml` con axum 0.8 + tower-http (cors)
 - [x] F3.1.2 — Routes: GET/POST/PUT/DELETE /observations, POST /search, GET /stats, POST /sessions, GET /graph/:id, GET /capsules, POST /consolidate, POST /inject
-- [x] F3.1.3 — `engram serve [port]` (default 7437)
+- [x] F3.1.3 — `the-crab-engram serve [port]` (default 7437)
 - [x] F3.1.4 — Tests de API (5+ endpoints)
 
 **DoD F3.1:** API HTTP funcional, P95 latency <50ms
@@ -519,7 +519,7 @@ _Objetivo: Production-ready + features de alto impacto._
 - [x] F3.2.6 — Capsules view (lista de capsules, drill-down)
 - [x] F3.2.7 — AntiPatterns view (warnings activos)
 - [x] F3.2.8 — Boundaries view (mapa de conocimiento del agente)
-- [x] F3.2.9 — `engram tui` subcommand
+- [x] F3.2.9 — `the-crab-engram tui` subcommand
 
 **DoD F3.2:** TUI interactiva con todas las views funcionales
 
@@ -532,7 +532,7 @@ _Objetivo: Production-ready + features de alto impacto._
 - [x] F3.3.1 — Chunk export (JSONL gzip, SHA-256 ID, manifest.json)
 - [x] F3.3.2 — Chunk import (descomprimir, INSERT OR IGNORE)
 - [x] F3.3.3 — Test bidireccional de compatibilidad JSON con Go
-- [x] F3.3.4 — `engram sync --status`
+- [x] F3.3.4 — `the-crab-engram sync --status`
 
 **DoD F3.3:** Chunk sync bidireccional con Engram Go
 
@@ -558,7 +558,7 @@ _Objetivo: Production-ready + features de alto impacto._
 
 - [x] F3.5.1 — Chacha20Poly1305 sobre archivo (no SQLCipher — más simple, compatible con bundled SQLite)
 - [x] F3.5.2 — `EncryptedStore` wrapper (Argon2id key derivation, passphrase de env var o OS keyring)
-- [x] F3.5.3 — `engram encrypt` / `engram decrypt` para migration
+- [x] F3.5.3 — `the-crab-engram encrypt` / `the-crab-engram decrypt` para migration
 - [x] F3.5.4 — Flag `--encrypt` en CLI, auto-detección de DB cifrada
 
 **DoD F3.5:** Cifrado transparente, auto-detección funciona

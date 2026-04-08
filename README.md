@@ -101,16 +101,16 @@ cd the-crab-engram
 cargo build --release
 
 # Start MCP server (for AI agents)
-./target/release/engram mcp
+./target/release/the-crab-engram mcp
 
 # Start HTTP API
-./target/release/engram serve
+./target/release/the-crab-engram serve
 
 # Launch TUI
-./target/release/engram tui
+./target/release/the-crab-engram tui
 
 # CLI search
-./target/release/engram search "auth implementation"
+./target/release/the-crab-engram search "auth implementation"
 ```
 
 ---
@@ -197,7 +197,7 @@ graph TD
 
 ```bash
 # Start server
-engram serve --port 7437
+the-crab-engram serve --port 7437
 
 # CRUD
 POST   /observations          # Create
@@ -233,7 +233,7 @@ Full OpenAPI spec: [`docs/openapi.yaml`](docs/openapi.yaml)
 ## TUI
 
 ```
-engram tui
+the-crab-engram tui
 ```
 
 | Key | Action |

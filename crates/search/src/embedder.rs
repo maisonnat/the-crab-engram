@@ -163,7 +163,7 @@ impl Embedder {
         if stale_count > 0 {
             warn!(
                 "Found {} embeddings from different model ({}). \
-                 Search quality degraded. Run `engram reembed` to fix.",
+                 Search quality degraded. Run `the-crab-engram reembed` to fix.",
                 stale_count, self.meta.model_name
             );
         }

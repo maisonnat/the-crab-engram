@@ -9,7 +9,7 @@
 cargo build --release
 
 # Start MCP server (configure your agent to launch this)
-./target/release/engram mcp
+./target/release/the-crab-engram mcp
 ```
 
 ### 2. Session Lifecycle
@@ -139,7 +139,7 @@ mem_context(project="my-project", limit=10)
 
 ```bash
 # Start
-engram serve --port 7437
+the-crab-engram serve --port 7437
 
 # Create observation
 curl -X POST http://localhost:7437/observations \
@@ -166,7 +166,7 @@ curl -X POST http://localhost:7437/consolidate
 ## How to Use the TUI
 
 ```bash
-engram tui
+the-crab-engram tui
 ```
 
 **Views:**
@@ -183,22 +183,22 @@ engram tui
 
 ```bash
 # Export context as system prompt (KILLER FEATURE)
-engram export-context --max-tokens 2000
+the-crab-engram export-context --max-tokens 2000
 
 # Outputs Markdown with top observations by access count, formatted for injection
 # into AI agent system prompts
 
 # Full export/import
-engram export --output backup.json
-engram import backup.json
+the-crab-engram export --output backup.json
+the-crab-engram import backup.json
 
 # Sync between machines
-engram sync export --dir ./chunks
-engram sync import --dir ./chunks
-engram sync status
+the-crab-engram sync export --dir ./chunks
+the-crab-engram sync import --dir ./chunks
+the-crab-engram sync status
 
 # Encrypt
-engram encrypt --passphrase "secret"
+the-crab-engram encrypt --passphrase "secret"
 ```
 
 ---
@@ -210,6 +210,6 @@ engram encrypt --passphrase "secret"
 3. **Save attachments** — code diffs and error traces are more searchable than descriptions
 4. **Run `mem_consolidate`** periodically — keeps the knowledge base clean
 5. **Use `mem_inject`** before starting work — get relevant memories + warnings + boundaries
-6. **Export context** as system prompt for new sessions — `engram export-context`
+6. **Export context** as system prompt for new sessions — `the-crab-engram export-context`
 7. **Check `mem_beliefs`** — evolving beliefs capture what the system "thinks" is true
 8. **Use `mem_stream`** — real-time detection of deja-vu, anti-patterns, file context

@@ -13,7 +13,7 @@ The system MUST initialize an MCP server with rmcp over stdio transport.
 #### Scenario: Server starts with stdio transport
 
 - GIVEN SqliteStore and config
-- WHEN `engram mcp` is called
+- WHEN `the-crab-engram mcp` is called
 - THEN EngramServer starts listening on stdio
 
 #### Scenario: Tool profiles filter available tools

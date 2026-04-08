@@ -7,15 +7,15 @@ use engram_core::{ObservationType, Scope};
 use engram_mcp::{EngramConfig, EngramServer, ToolProfile};
 use engram_store::{AddObservationParams, SearchOptions, SqliteStore, Storage};
 
-/// engram-rust: Persistent memory for AI coding agents
+/// The Crab Engram: Persistent memory for AI coding agents
 #[derive(Parser)]
 #[command(
-    name = "engram",
+    name = "the-crab-engram",
     version = "2.0.0",
     about = "Persistent memory for AI agents"
 )]
 struct Cli {
-    /// Path to the engram database
+    /// Path to the database
     #[arg(long, global = true)]
     db: Option<PathBuf>,
 
@@ -147,7 +147,7 @@ enum Commands {
         #[arg(long)]
         passphrase: String,
     },
-    /// Setup engram for a specific AI agent
+    /// Setup The Crab Engram for a specific AI agent
     Setup {
         /// Agent to configure
         #[arg(value_enum)]
@@ -421,9 +421,9 @@ async fn main() -> Result<()> {
         }
 
         Commands::Version => {
-            println!("engram-rust v2.0.0");
+            println!("The Crab Engram v2.0.0");
             println!("Persistent memory for AI coding agents");
-            println!("https://github.com/Gentleman-Programming/engram-rust");
+            println!("https://github.com/maisonnat/the-crab-engram");
         }
 
         Commands::Serve { port } => {
@@ -434,7 +434,7 @@ async fn main() -> Result<()> {
             };
             let app = engram_api::create_router(state);
             let addr = format!("0.0.0.0:{port}");
-            eprintln!("engram serve v2.0.0 — HTTP API on {addr}");
+            eprintln!("The Crab Engram v2.0.0 — HTTP API on {addr}");
             let listener = tokio::net::TcpListener::bind(&addr).await?;
             axum::serve(listener, app).await?;
         }
@@ -570,8 +570,8 @@ async fn main() -> Result<()> {
 
             println!("✅ Setup complete for {agent_name}");
             println!("   SKILL.md written to: {}", target_file.display());
-            println!("\nAdd this to your agent config to use engram:");
-            println!("   engram mcp --project <your-project>");
+            println!("\nAdd this to your agent config to use The Crab Engram:");
+            println!("   the-crab-engram mcp --project <your-project>");
         }
     }
 

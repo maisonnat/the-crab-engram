@@ -15,9 +15,9 @@
 - **AND** if no embeddings are available, SHALL fall back to FTS5-only with decay scoring
 
 ### WRQ-3: Crypto Module Wired to Encrypt Command
-- **WHEN** user runs `engram encrypt <file>` from CLI
+- **WHEN** user runs `the-crab-engram encrypt <file>` from CLI
 - **THEN** the command SHALL use `engram_core::crypto::encrypt()` with a derived key from passphrase
-- **AND** `engram decrypt <file>` SHALL use `engram_core::crypto::decrypt()`
+- **AND** `the-crab-engram decrypt <file>` SHALL use `engram_core::crypto::decrypt()`
 - **AND** the current direct file I/O approach SHALL be replaced
 
 ### WRQ-4: Episodic/Semantic Memory Population

@@ -1,10 +1,10 @@
-# Engram-Rust — Security Posture
+# The Crab Engram — Security Posture
 
 ## Encryption
 
 ### Database Encryption
 
-Engram uses **ChaCha20-Poly1305** (AEAD cipher) for database-level encryption:
+The Crab Engram uses **ChaCha20-Poly1305** (AEAD cipher) for database-level encryption:
 
 ```rust
 // Key derivation: SHA-256(passphrase + "engram-salt-v1")
@@ -25,7 +25,7 @@ let decrypted = engram_core::decrypt(&key, &encrypted)?;
 
 **Usage:**
 ```bash
-engram encrypt --passphrase "my-secret"
+the-crab-engram encrypt --passphrase "my-secret"
 # → Creates engram.encrypted.db (or engram.decrypted.db if already encrypted)
 ```
 
