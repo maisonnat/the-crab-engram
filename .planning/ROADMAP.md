@@ -29,12 +29,13 @@
 **Requirements**: BUILD-01, BUILD-02, BUILD-03, BUILD-04, BUILD-05, BUILD-06, BUILD-07
 **Success Criteria** (what must be TRUE):
   1. Running the release workflow produces artifacts for all 8 targets (linux-gnu x2, linux-musl x2, macOS x2, Windows x2)
-  2. Release includes 12 artifacts (8 archives + .deb + .rpm + 2× .msi placeholder)
+  2. Release includes 10 artifacts (8 archives + .deb + checksums-sha256.txt); .rpm and .msi deferred to Phase 6
   3. Every archive is named with target triple: `the-crab-engram-{version}-{target}.{ext}`
-  4. Linux musl builds produce fully static binaries using native `musl-tools`
-  5. ARM builds use native runners (`ubuntu-24.04-arm`, `windows-11-arm`)
+  4. All Linux targets build with `cross` (pinned v0.2.5) — no manual musl-tools or native ARM runners
+  5. Windows ARM64 uses `windows-11-arm` native runner
   6. A single target failure does not cancel other targets (`fail-fast: false`)
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 01-01-PLAN.md — Expand build matrix, add .deb job, update release job
 
 ### Phase 2: Self-Update Engine
 
@@ -138,7 +139,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Build Matrix | 0/7 | Not started | - |
+| 1. Build Matrix | 0/1 | Planning complete | - |
 | 2. Self-Update Engine | 0/6 | Not started | - |
 | 3. Version Transparency | 0/3 | Not started | - |
 | 4. Backup Core | 0/7 | Not started | - |
