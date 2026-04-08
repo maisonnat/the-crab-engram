@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 env:
-  BINARY_NAME: engram
+  BINARY_NAME: the-crab-engram
 
 jobs:
   build:
@@ -20,16 +20,16 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact: engram
-            archive: engram-linux-x86_64.tar.gz
+            artifact: the-crab-engram
+            archive: the-crab-engram-linux-x86_64.tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
-            artifact: engram
-            archive: engram-macos-arm64.tar.gz
+            artifact: the-crab-engram
+            archive: the-crab-engram-macos-arm64.tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            artifact: engram.exe
-            archive: engram-windows-x86_64.zip
+            artifact: the-crab-engram.exe
+            archive: the-crab-engram-windows-x86_64.zip
 
     steps:
       - uses: actions/checkout@v4
