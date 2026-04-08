@@ -1,4 +1,4 @@
-# Engram-Rust — User Guide
+# The Crab Engram — User Guide
 
 ## Quick Start for AI Agents
 
@@ -9,7 +9,7 @@
 cargo build --release
 
 # Start MCP server (configure your agent to launch this)
-./target/release/engram mcp --project my-project --profile agent
+./target/release/engram mcp
 ```
 
 ### 2. Session Lifecycle
@@ -104,19 +104,17 @@ mem_context(project="my-project", limit=10)
 | Tool | What It Does |
 |---|---|
 | `mem_capture_passive` | Analyze agent output and auto-extract learnings (errors, changes, test results) |
-| `mem_capture_git` | Capture a git commit as observation with GitCommit + CodeDiff attachments |
-| `mem_capture_error` | Capture compilation/test error with ErrorTrace attachment |
 | `mem_stream` | Detect real-time events: file context, deja-vu, anti-patterns, pending reviews |
+| `mem_inject` | Build smart context injection for a task (relevant memories + warnings + boundaries) |
 
 ### Knowledge Graph Tools
 
 | Tool | What It Does |
 |---|---|
-| `mem_relate` | Create typed edge between two observations |
-| `mem_graph` | BFS around an observation to explore relationships |
+| `mem_add_edge` | Add typed edge between two observations (supersedes, depends_on, contradicts) |
+| `mem_graph` | Get graph data for visualization |
 | `mem_synthesize` | Generate KnowledgeCapsule from related observations |
-| `mem_capsule_list` | List all capsules |
-| `mem_capsule_get` | Get full capsule with decisions, issues, patterns |
+| `mem_open_graph` | Open graph visualization |
 
 ### Maintenance Tools
 
