@@ -26,13 +26,13 @@ The agent's brain must never be lost. All update, distribution, and packaging wo
 - ✓ CLI with 18 subcommands (mcp, search, save, export, import, serve, tui, etc.) — existing
 - ✓ Cargo workspace with 8 crates (core, store, search, learn, mcp, api, tui, sync) — existing
 - ✓ Release workflow producing 3 targets (linux-gnu, macos-arm64, windows-msvc) — existing
+- ✓ **BUILD-MATRIX-01**: Release produces 8 targets (linux-gnu x2, linux-musl x2, macos x2, windows x2) — validated in Phase 1
+- ✓ **BUILD-MATRIX-02**: Release produces 10 artifacts (8 archives + .deb + checksums; .rpm/.msi deferred to Phase 6) — validated in Phase 1
 
 ### Active
 
 - [ ] **SELF-UPDATE-01**: User can self-update binary with `the-crab-engram update`
 - [ ] **SELF-UPDATE-02**: User can check for updates without downloading with `--check-only`
-- [ ] **BUILD-MATRIX-01**: Release produces 8 targets (linux-gnu x2, linux-musl x2, macos x2, windows x2)
-- [ ] **BUILD-MATRIX-02**: Release produces 12 artifacts (tar.gz, zip, .deb, .rpm, .msi)
 - [ ] **VERSION-01**: User can see version, commit hash, target triple via enhanced `version` command
 - [ ] **BACKUP-01**: User can create manual backups with `the-crab-engram backup`
 - [ ] **BACKUP-02**: System creates automatic pre-update backups before self-update
@@ -88,7 +88,7 @@ The agent's brain must never be lost. All update, distribution, and packaging wo
 
 ---
 
-*Last updated: 2026-04-08 after initialization*
+*Last updated: 2026-04-08 after Phase 1 (Build Matrix) completion*
 
 ## Evolution
 
