@@ -31,9 +31,10 @@ The agent's brain must never be lost. All update, distribution, and packaging wo
 
 - ✓ **SELF-UPDATE-01**: User can self-update binary with `the-crab-engram self update` — validated in Phase 2
 - ✓ **SELF-UPDATE-02**: User can check for updates without downloading with `the-crab-engram self update --check-only` — validated in Phase 2
+- ✓ **VERSION-01**: User can see version, commit hash, target triple via enhanced `version` command — validated in Phase 3
 
 ### Active
-- [ ] **VERSION-01**: User can see version, commit hash, target triple via enhanced `version` command
+
 - [ ] **BACKUP-01**: User can create manual backups with `the-crab-engram backup`
 - [ ] **BACKUP-03**: System creates automatic pre-migration backups before schema migrations
 - [ ] **RESTORE-01**: User can list and restore backups with `the-crab-engram restore`
