@@ -50,7 +50,7 @@
   5. If update produces a 0-byte or corrupt binary (Windows edge case), system rolls back to previous version
   6. Update uses `self_update` with `rustls` — no OpenSSL dependency
 **Plans**: 1 plan
-- [ ] 02-01-PLAN.md — Add self_update dependency, CLI subcommand, update handler with checksum + size verification
+- [x] 02-01-PLAN.md — Add self_update dependency, CLI subcommand, update handler with checksum + size verification
 
 ### Phase 3: Version Transparency
 
@@ -141,7 +141,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Build Matrix | 0/1 | Planning complete | - |
-| 2. Self-Update Engine | 0/1 | Planning complete | - |
+| 2. Self-Update Engine | 1/1 | Plan 01 completed | 2026-04-11 |
 | 3. Version Transparency | 0/3 | Not started | - |
 | 4. Backup Core | 0/7 | Not started | - |
 | 5. Restore & Auto-Backup | 0/8 | Not started | - |

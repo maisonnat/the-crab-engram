@@ -22,7 +22,7 @@ progress:
 
 ## Current Position
 
-- **Phase**: 01-build-matrix
+- **Phase**: 02-self-update-engine
 - **Plan**: 01 / 1 (completed)
 - **Current Plan**: 01 / 1
 - **Status**: Plan 01 completed, ready for next plan
@@ -38,6 +38,7 @@ progress:
 | Critical Path Length | 4 phases (1→2→6/7/8) |
 | Parallel Tracks | 2 (Build+Update vs Backup) |
 | Phase 01-build-matrix P01 | 5min | 3 tasks | 1 files |
+| Phase 02-self-update-engine P01 | 35min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -56,6 +57,13 @@ progress:
 - Target-triple naming: `the-crab-engram-{version}-{target}.{ext}` — required by self_update
 - `.deb` in separate job using `cargo-deb` — follows ripgrep pattern
 - Pin `cross` to v0.2.5 — avoid upstream breakage
+- `self` namespace for self-update commands (D-01) — groups self-management logically
+- Hardcoded repo owner/name constants (D-02) — simple, no env var override needed for v1
+- No persistent binary backup (D-03) — atomic replace + post-update size verification
+- No interactive confirmation prompt (D-04) — user intent assumed, --dry-run flag provided
+- All error messages colored and actionable (D-05) with recovery hints
+- Self-update never touches SQLite database (D-06) — only binary executable modified
+- self_update v0.44.0 with rustls + archive features (D-07) — no OpenSSL dependency
 
 ### Critical Pitfalls to Watch
 
@@ -76,7 +84,8 @@ progress:
 |---------|------|----------|-------|
 | 1 | 2026-04-08 | Research + Roadmap | 52 requirements, 8 phases, 100% coverage |
 | 2 | 2026-04-08 | Execute Phase 01 Plan 01 | Expanded release workflow to 8 targets with cross-compilation |
+| 3 | 2026-04-11 | Execute Phase 02 Plan 01 | Implemented self-update CLI subcommand with checksum verification and binary size check |
 
 ---
 
-*Last updated: 2026-04-08 — Phase 01 Plan 01 completed*
+*Last updated: 2026-04-11 — Phase 02 Plan 01 completed*
