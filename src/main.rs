@@ -453,9 +453,14 @@ async fn main() -> Result<()> {
         }
 
         Commands::Version => {
-            println!("The Crab Engram v2.0.0");
-            println!("Persistent memory for AI coding agents");
-            println!("https://github.com/maisonnat/the-crab-engram");
+            let version = env!("CARGO_PKG_VERSION");
+            let hash = env!("GIT_HASH");
+            let date = env!("GIT_DATE");
+            let target = self_update::get_target();
+
+            eprintln!("the-crab-engram {version} ({hash} {date})");
+            eprintln!("target: {target}");
+            eprintln!("update: run `the-crab-engram self update` to check for updates");
         }
 
         Commands::Serve { port } => {
@@ -611,8 +616,13 @@ async fn main() -> Result<()> {
                     handle_self_update(check_only, dry_run)?;
                 }
                 SelfAction::Version => {
-                    println!("The Crab Engram v{}", env!("CARGO_PKG_VERSION"));
-                    println!("https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}");
+                    let version = env!("CARGO_PKG_VERSION");
+                    let hash = env!("GIT_HASH");
+                    let date = env!("GIT_DATE");
+
+                    eprintln!("the-crab-engram {version} ({hash} {date})");
+                    eprintln!("https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}");
+                    eprintln!("update: run `the-crab-engram self update` to check for updates");
                 }
             }
         }
