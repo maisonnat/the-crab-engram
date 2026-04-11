@@ -29,10 +29,10 @@ The agent's brain must never be lost. All update, distribution, and packaging wo
 - ✓ **BUILD-MATRIX-01**: Release produces 8 targets (linux-gnu x2, linux-musl x2, macos x2, windows x2) — validated in Phase 1
 - ✓ **BUILD-MATRIX-02**: Release produces 10 artifacts (8 archives + .deb + checksums; .rpm/.msi deferred to Phase 6) — validated in Phase 1
 
-### Active
+- ✓ **SELF-UPDATE-01**: User can self-update binary with `the-crab-engram self update` — validated in Phase 2
+- ✓ **SELF-UPDATE-02**: User can check for updates without downloading with `the-crab-engram self update --check-only` — validated in Phase 2
 
-- [ ] **SELF-UPDATE-01**: User can self-update binary with `the-crab-engram self update`
-- [ ] **SELF-UPDATE-02**: User can check for updates without downloading with `the-crab-engram self update --check-only`
+### Active
 - [ ] **VERSION-01**: User can see version, commit hash, target triple via enhanced `version` command
 - [ ] **BACKUP-01**: User can create manual backups with `the-crab-engram backup`
 - [ ] **BACKUP-03**: System creates automatic pre-migration backups before schema migrations
