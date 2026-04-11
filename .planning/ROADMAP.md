@@ -61,7 +61,8 @@
   1. `the-crab-engram --version` shows version, git commit hash, commit date, and target triple
   2. Git metadata is embedded at compile time via `build.rs`
   3. Version output includes update hint: "Run `the-crab-engram update` to check for updates"
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 03-01-PLAN.md — Create build.rs for git metadata, enhance version and self version handlers
 
 ### Phase 4: Backup Core
 
