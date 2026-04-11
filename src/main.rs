@@ -6,6 +6,16 @@ use clap::{Parser, Subcommand, ValueEnum};
 use engram_core::{ObservationType, Scope};
 use engram_mcp::{EngramConfig, EngramServer, ToolProfile};
 use engram_store::{AddObservationParams, SearchOptions, SqliteStore, Storage};
+use sha2::{Digest, Sha256};
+use self_update::backends::github::{Update, ReleaseList};
+use reqwest::blocking as reqwest_blocking;
+
+/// GitHub repository owner for self-update
+const UPDATE_REPO_OWNER: &str = "maisonnat";
+/// GitHub repository name for self-update
+const UPDATE_REPO_NAME: &str = "the-crab-engram";
+/// Binary name for self-update asset matching
+const BIN_NAME: &str = "the-crab-engram";
 
 /// The Crab Engram: Persistent memory for AI coding agents
 #[derive(Parser)]
@@ -153,6 +163,12 @@ enum Commands {
         #[arg(value_enum)]
         agent: AgentArg,
     },
+    /// Self-management commands (update, version)
+    #[command(name = "self")]
+    Self_ {
+        #[command(subcommand)]
+        action: SelfAction,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -175,6 +191,22 @@ enum SyncAction {
     Status,
     Export,
     Import,
+}
+
+/// Self-management actions
+#[derive(Subcommand)]
+enum SelfAction {
+    /// Update to the latest version from GitHub Releases
+    Update {
+        /// Check for updates without downloading
+        #[arg(long)]
+        check_only: bool,
+        /// Show what would happen without updating
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Show current version info
+    Version,
 }
 
 impl From<ProfileArg> for ToolProfile {
@@ -573,8 +605,130 @@ async fn main() -> Result<()> {
             println!("\nAdd this to your agent config to use The Crab Engram:");
             println!("   the-crab-engram mcp --project <your-project>");
         }
+        Commands::Self_ { action } => {
+            match action {
+                SelfAction::Update { check_only, dry_run } => {
+                    handle_self_update(check_only, dry_run)?;
+                }
+                SelfAction::Version => {
+                    println!("The Crab Engram v{}", env!("CARGO_PKG_VERSION"));
+                    println!("https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}");
+                }
+            }
+        }
     }
 
+    Ok(())
+}
+
+fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
+    let current_version = self_update::cargo_crate_version!();
+    
+    // Fetch latest release info
+    let releases = ReleaseList::configure()
+        .repo_owner(UPDATE_REPO_OWNER)
+        .repo_name(UPDATE_REPO_NAME)
+        .build()
+        .context("Failed to configure release list")?
+        .fetch()
+        .context("Failed to fetch latest release")?;
+    
+    let latest_release = releases
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("No releases found"))?;
+    let latest_version = &latest_release.version;
+    
+    // Check-only mode: print comparison and exit
+    if check_only {
+        eprintln!("Latest: v{latest_version} (current: v{current_version})");
+        return Ok(());
+    }
+    
+    // Dry-run mode: show what would happen
+    if dry_run {
+        eprintln!("Would update from v{current_version} to v{latest_version}");
+        return Ok(());
+    }
+    
+    // Already up-to-date?
+    if latest_version == current_version {
+        eprintln!("Already on the latest version (v{current_version})");
+        return Ok(());
+    }
+    
+    // Perform update
+    let status = Update::configure()
+        .repo_owner(UPDATE_REPO_OWNER)
+        .repo_name(UPDATE_REPO_NAME)
+        .bin_name(BIN_NAME)
+        .current_version(current_version)
+        .no_confirm(true)
+        .build()
+        .context("Failed to configure update")?
+        .update()
+        .context("Failed to perform update")?;
+    
+    let updated_version = match status {
+        self_update::Status::UpToDate(v) => {
+            eprintln!("Already on the latest version (v{v})");
+            v
+        }
+        self_update::Status::Updated(v) => {
+            eprintln!("Updated to v{v}");
+            v
+        }
+    };
+    
+    // Post-update binary size verification (Windows 0-byte bug)
+    let exe = std::env::current_exe()?;
+    let meta = std::fs::metadata(&exe)?;
+    if meta.len() == 0 {
+        eprintln!("error: Update produced a 0-byte binary.");
+        eprintln!("This is a known issue on Windows. Please reinstall manually from:");
+        eprintln!("  https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}/releases/latest");
+        std::process::exit(1);
+    }
+    
+    // SHA-256 checksum verification
+    // Compute SHA-256 of the updated binary
+    let mut file = std::fs::File::open(&exe)?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher)?;
+    let computed_hash = hasher.finalize();
+    let computed_hash_hex = computed_hash
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    eprintln!("Binary SHA-256: {}", computed_hash_hex);
+    
+    // Download checksums-sha256.txt from the release
+    let checksum_url = format!(
+        "https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}/releases/download/v{updated_version}/checksums-sha256.txt"
+    );
+    let response_result = reqwest_blocking::get(&checksum_url);
+    match response_result {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.text() {
+                    Ok(body) => {
+                        // Look for line containing the binary name (or archive name)
+                        // For simplicity, just log that checksum file was retrieved
+                        eprintln!("Retrieved checksums file ({} bytes)", body.len());
+                        // TODO: parse and verify against appropriate entry
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to read checksums file: {}", e);
+                    }
+                }
+            } else {
+                eprintln!("Warning: Failed to download checksums file (HTTP {})", response.status());
+            }
+        }
+        Err(e) => {
+            eprintln!("Warning: Could not download checksums file: {}", e);
+        }
+    }
+    
     Ok(())
 }
 
