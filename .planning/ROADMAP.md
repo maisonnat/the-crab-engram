@@ -77,7 +77,8 @@
   5. Each backup includes a `.meta.json` sidecar with version, schema version, timestamp, trigger, size, checksum, and stats
   6. Auto-backups rotate (last 10 kept), manual backups are never auto-deleted
   7. Backup methods live on the `Storage` trait — no new crate required
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 04-01-PLAN.md — Add backup types, Storage trait methods, SqliteStore implementation, CLI commands
 
 ### Phase 5: Restore & Auto-Backup
 
@@ -144,7 +145,7 @@
 | 1. Build Matrix | 0/1 | Planning complete | - |
 | 2. Self-Update Engine | 1/1 | Plan 01 completed | 2026-04-11 |
 | 3. Version Transparency | 0/3 | Not started | - |
-| 4. Backup Core | 0/7 | Not started | - |
+| 4. Backup Core | 0/1 | Planning complete | - |
 | 5. Restore & Auto-Backup | 0/8 | Not started | - |
 | 6. Packaging | 0/14 | Not started | - |
 | 7. Install Scripts | 0/3 | Not started | - |
