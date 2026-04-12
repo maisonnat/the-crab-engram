@@ -351,4 +351,12 @@ pub trait Storage: Send + Sync {
 
     /// Verify backup file integrity (SHA-256 + SQLite integrity_check).
     fn backup_verify(&self, path: &Path) -> Result<BackupVerifyResult>;
+
+    /// List all backups from disk, sorted newest-first (ID 1 = most recent).
+    fn backup_list(&self) -> Result<Vec<BackupRecord>>;
+
+    /// Restore from a backup file.
+    /// Flow per D-02: verify integrity → create pre-restore backup → copy backup over DB.
+    /// When `confirm` is false, skips confirmation prompt (--yes flag).
+    fn backup_restore(&self, backup_path: &Path, confirm: bool) -> Result<()>;
 }

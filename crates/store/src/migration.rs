@@ -109,6 +109,32 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> crate::Result<()> {
     Ok(())
 }
 
+/// Return list of migration versions not yet applied to this connection.
+pub fn pending_migrations(conn: &rusqlite::Connection) -> crate::Result<Vec<i32>> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS _migrations (
+            version INTEGER PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );",
+    )
+    .map_err(|e| EngramError::Database(e.to_string()))?;
+
+    let mut pending = Vec::new();
+    for migration in MIGRATIONS {
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM _migrations WHERE version = ?",
+                [migration.version],
+                |row| row.get(0),
+            )
+            .map_err(|e| EngramError::Database(e.to_string()))?;
+        if !exists {
+            pending.push(migration.version);
+        }
+    }
+    Ok(pending)
+}
+
 /// Fix schema compatibility between Go engram DB and Rust engram DB.
 /// Adds missing columns/tables that the Go version didn't have.
 fn fix_schema_compat(conn: &rusqlite::Connection) -> crate::Result<()> {
