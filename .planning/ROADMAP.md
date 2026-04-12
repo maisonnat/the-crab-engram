@@ -95,8 +95,8 @@
   7. System creates automatic backup before data imports
   8. Restore requires user confirmation unless `--yes` flag is passed
 **Plans**: 2 plans
-- [ ] 05-01-PLAN.md — Storage trait extension + pending_migrations + SqliteStore implementation (backend)
-- [ ] 05-02-PLAN.md — Restore CLI command + auto-backup before import (frontend)
+- [x] 05-01-PLAN.md — Storage trait extension + pending_migrations + SqliteStore implementation (backend)
+- [x] 05-02-PLAN.md — Restore CLI command + auto-backup before import (frontend)
 
 ### Phase 6: Packaging — Linux, macOS, Windows
 
