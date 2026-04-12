@@ -94,7 +94,9 @@
   6. System creates automatic backup before schema migrations
   7. System creates automatic backup before data imports
   8. Restore requires user confirmation unless `--yes` flag is passed
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 05-01-PLAN.md — Storage trait extension + pending_migrations + SqliteStore implementation (backend)
+- [ ] 05-02-PLAN.md — Restore CLI command + auto-backup before import (frontend)
 
 ### Phase 6: Packaging — Linux, macOS, Windows
 
@@ -146,7 +148,7 @@
 | 2. Self-Update Engine | 1/1 | Plan 01 completed | 2026-04-11 |
 | 3. Version Transparency | 0/3 | Not started | - |
 | 4. Backup Core | 0/1 | Planning complete | - |
-| 5. Restore & Auto-Backup | 0/8 | Not started | - |
+| 5. Restore & Auto-Backup | 0/2 | Planning complete | - |
 | 6. Packaging | 0/14 | Not started | - |
 | 7. Install Scripts | 0/3 | Not started | - |
 | 8. Background Update Check | 0/4 | Not started | - |

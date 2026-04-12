@@ -22,11 +22,10 @@ progress:
 
 ## Current Position
 
-- **Phase**: 03-version-transparency
-- **Plan**: 01 / 1 (planning complete)
-- **Current Plan**: 01 / 1
-- **Status**: Plan 01 created, ready for execution
-- **Progress**: `██░░░░░░░░░░░░░░░░░░ 2/8 phases`
+- **Phase**: 05-restore-auto-backup
+- **Plan**: 01-02 / 2 (planning complete)
+- **Status**: 2 plans created, ready for execution
+- **Progress**: `███████░░░░░░░░░░░░░ 4/8 phases`
 
 ## Performance Metrics
 
