@@ -137,6 +137,21 @@ enum Commands {
         /// Path to backup file
         file: PathBuf,
     },
+    /// Restore from backup
+    Restore {
+        /// List all backups
+        #[arg(long)]
+        list: bool,
+        /// Restore by backup ID (position in list, 1 = most recent)
+        #[arg(long)]
+        id: Option<usize>,
+        /// Restore from explicit backup file
+        #[arg(long)]
+        file: Option<PathBuf>,
+        /// Skip confirmation prompt
+        #[arg(long)]
+        yes: bool,
+    },
     /// Version info
     Version,
     /// Start HTTP REST API server
@@ -235,6 +250,17 @@ fn default_db_path() -> Result<PathBuf> {
     let engram_dir = home.join(".engram");
     std::fs::create_dir_all(&engram_dir).context("failed to create ~/.engram")?;
     Ok(engram_dir.join("engram.db"))
+}
+
+/// Format bytes as human-readable string.
+fn format_bytes(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    }
 }
 
 fn open_store(db_path: Option<PathBuf>) -> Result<SqliteStore> {
@@ -425,6 +451,11 @@ async fn main() -> Result<()> {
 
         Commands::Import { file } => {
             let store = open_store(cli.db)?;
+
+            // BACKUP-08: Auto-backup before data import
+            let backup_record = store.backup_create("auto-import", None)?;
+            eprintln!("Auto-backup created: {}", backup_record.path.display());
+
             let json = std::fs::read_to_string(&file)?;
             let data: engram_store::ExportData = serde_json::from_str(&json)?;
             let result = store.import(&data)?;
@@ -489,6 +520,58 @@ async fn main() -> Result<()> {
                 }
                 std::process::exit(1);
             }
+        }
+
+        Commands::Restore { list, id, file, yes } => {
+            let store = open_store(cli.db)?;
+
+            // BACKUP-03: List backups
+            if list {
+                let backups = store.backup_list()?;
+                if backups.is_empty() {
+                    eprintln!("No backups found.");
+                    return Ok(());
+                }
+                eprintln!("{:<4} {:<22} {:<10} {:<20} {:<10} {}", "#", "Created", "Trigger", "Label", "Size", "SHA-256");
+                eprintln!("{}", "-".repeat(90));
+                for (i, b) in backups.iter().enumerate() {
+                    let label = b.label.as_deref().unwrap_or("");
+                    let size = format_bytes(b.size_bytes);
+                    let short_sha = &b.sha256[..std::cmp::min(12, b.sha256.len())];
+                    eprintln!(
+                        "{:<4} {:<22} {:<10} {:<20} {:<10} {}...",
+                        i + 1,
+                        b.created_at.format("%Y-%m-%dT%H:%M:%SZ"),
+                        b.trigger,
+                        label,
+                        size,
+                        short_sha,
+                    );
+                }
+                return Ok(());
+            }
+
+            // Determine backup path
+            let backup_path = if let Some(id) = id {
+                // BACKUP-04: Restore by ID
+                let backups = store.backup_list()?;
+                if id == 0 || id > backups.len() {
+                    anyhow::bail!("Invalid backup ID {}. Use --list to see available backups.", id);
+                }
+                backups[id - 1].path.clone()
+            } else if let Some(ref path) = file {
+                // BACKUP-05: Restore by file
+                if !path.exists() {
+                    anyhow::bail!("Backup file not found: {}", path.display());
+                }
+                path.clone()
+            } else {
+                anyhow::bail!("Specify --list, --id N, or --file PATH");
+            };
+
+            // BACKUP-10 + BACKUP-09 + D-04: verify → pre-restore → copy (confirm unless --yes)
+            store.backup_restore(&backup_path, !yes)?;
+            eprintln!("Restore complete from {}", backup_path.display());
         }
 
         Commands::Version => {
