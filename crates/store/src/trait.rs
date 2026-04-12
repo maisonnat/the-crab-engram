@@ -3,6 +3,7 @@ use engram_core::{
     Session,
 };
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::params::*;
 
@@ -69,6 +70,35 @@ pub struct SessionContext {
     pub session: Session,
     pub observations: Vec<Observation>,
     pub prompts: Vec<String>,
+}
+
+/// Statistics snapshot for backup metadata.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BackupStats {
+    pub observations: usize,
+    pub sessions: usize,
+    pub edges: usize,
+}
+
+/// Record of a created backup.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BackupRecord {
+    pub path: PathBuf,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub trigger: String,
+    pub label: Option<String>,
+    pub size_bytes: u64,
+    pub sha256: String,
+    pub stats: BackupStats,
+}
+
+/// Result of verifying a backup.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BackupVerifyResult {
+    pub valid: bool,
+    pub sha256_match: bool,
+    pub integrity_check_pass: bool,
+    pub error: Option<String>,
 }
 
 /// Storage trait — THE firewall against vendor lock-in.
@@ -313,4 +343,12 @@ pub trait Storage: Send + Sync {
         agent_id: &str,
         project: &str,
     ) -> Result<Option<(String, String, String)>>;
+
+    // ── Backup ─────────────────────────────────────────────────────
+
+    /// Create a backup of the database. Returns backup record with metadata.
+    fn backup_create(&self, trigger: &str, label: Option<&str>) -> Result<BackupRecord>;
+
+    /// Verify backup file integrity (SHA-256 + SQLite integrity_check).
+    fn backup_verify(&self, path: &Path) -> Result<BackupVerifyResult>;
 }

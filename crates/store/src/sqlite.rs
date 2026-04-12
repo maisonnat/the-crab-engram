@@ -4,9 +4,9 @@ use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 use engram_core::{
-    Attachment, Edge, EngramError, KnowledgeCapsule, LifecycleState, Observation, ObservationType,
-    ProvenanceSource, QueryTarget, RelationType, Scope, Session, classify_query_type,
-    decay_score_with_lifecycle,
+    classify_query_type, decay_score_with_lifecycle, Attachment, Edge, EngramError,
+    KnowledgeCapsule, LifecycleState, Observation, ObservationType, ProvenanceSource, QueryTarget,
+    RelationType, Scope, Session,
 };
 use rusqlite::OptionalExtension;
 use tracing::info;
@@ -68,6 +68,40 @@ impl SqliteStore {
     /// Get a locked connection.
     fn conn(&self) -> std::sync::MutexGuard<'_, rusqlite::Connection> {
         self.conn.lock().expect("sqlite connection mutex poisoned")
+    }
+
+    /// Resolve backup directory: ~/.engram/backups/. Creates if needed.
+    fn backup_dir(&self) -> Result<std::path::PathBuf> {
+        let home = dirs::home_dir()
+            .ok_or_else(|| EngramError::Database("could not determine home directory".into()))?;
+        let dir = home.join(".engram").join("backups");
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| EngramError::Database(format!("failed to create backup dir: {e}")))?;
+        Ok(dir)
+    }
+
+    /// Query schema version from _migrations table.
+    fn schema_version(&self) -> i32 {
+        let conn = self.conn();
+        conn.query_row("SELECT MAX(version) FROM _migrations", [], |row| {
+            row.get::<_, Option<i32>>(0).map(|v| v.unwrap_or(0))
+        })
+        .unwrap_or(0)
+    }
+
+    /// Compute SHA-256 hex digest of a file.
+    fn sha256_file(path: &std::path::Path) -> Result<String> {
+        use sha2::{Digest, Sha256};
+        let mut file = std::fs::File::open(path)
+            .map_err(|e| EngramError::Database(format!("failed to open file for checksum: {e}")))?;
+        let mut hasher = Sha256::new();
+        std::io::copy(&mut file, &mut hasher)
+            .map_err(|e| EngramError::Database(format!("failed to compute checksum: {e}")))?;
+        Ok(hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect())
     }
 
     /// Row mapper: observation from SQL row.
@@ -1572,6 +1606,148 @@ impl Storage for SqliteStore {
         )
         .optional()
         .map_err(|e| EngramError::Database(e.to_string()))
+    }
+
+    fn backup_create(&self, trigger: &str, label: Option<&str>) -> Result<BackupRecord> {
+        let backup_dir = self.backup_dir()?;
+        let now = Utc::now();
+        let timestamp = now.format("%Y-%m-%dT%H-%M-%SZ").to_string();
+        let backup_filename = format!("engram-{timestamp}.db");
+        let backup_path = backup_dir.join(&backup_filename);
+
+        // rusqlite::backup::Backup::run_to_completion()
+        {
+            let conn = self.conn();
+            let mut dst = rusqlite::Connection::open(&backup_path)
+                .map_err(|e| EngramError::Database(format!("failed to create backup file: {e}")))?;
+            let backup = rusqlite::backup::Backup::new(&conn, &mut dst)
+                .map_err(|e| EngramError::Database(format!("failed to init backup: {e}")))?;
+            backup
+                .run_to_completion(500, std::time::Duration::from_millis(0), None)
+                .map_err(|e| EngramError::Database(format!("backup failed: {e}")))?;
+        }
+
+        let metadata = std::fs::metadata(&backup_path)
+            .map_err(|e| EngramError::Database(format!("failed to read backup metadata: {e}")))?;
+        let size_bytes = metadata.len();
+
+        let sha256 = Self::sha256_file(&backup_path)?;
+
+        // Stats
+        let conn = self.conn();
+        let observations: usize = conn
+            .query_row("SELECT COUNT(*) FROM observations", [], |row| {
+                row.get::<_, i64>(0).map(|v| v as usize)
+            })
+            .unwrap_or(0);
+        let sessions: usize = conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| {
+                row.get::<_, i64>(0).map(|v| v as usize)
+            })
+            .unwrap_or(0);
+        let edges: usize = conn
+            .query_row("SELECT COUNT(*) FROM edges", [], |row| {
+                row.get::<_, i64>(0).map(|v| v as usize)
+            })
+            .unwrap_or(0);
+
+        let stats = crate::r#trait::BackupStats {
+            observations,
+            sessions,
+            edges,
+        };
+
+        let schema_version = self.schema_version();
+
+        // Write .meta.json sidecar
+        let meta = serde_json::json!({
+            "version": env!("CARGO_PKG_VERSION"),
+            "schema_version": schema_version,
+            "created_at": now.to_rfc3339(),
+            "trigger": trigger,
+            "label": label,
+            "size_bytes": size_bytes,
+            "sha256": sha256,
+            "stats": {
+                "observations": stats.observations,
+                "sessions": stats.sessions,
+                "edges": stats.edges,
+            }
+        });
+        let meta_path = backup_dir.join(format!("engram-{timestamp}.meta.json"));
+        std::fs::write(&meta_path, serde_json::to_string_pretty(&meta)?)
+            .map_err(|e| EngramError::Database(format!("failed to write meta.json: {e}")))?;
+
+        Ok(crate::r#trait::BackupRecord {
+            path: backup_path,
+            created_at: now,
+            trigger: trigger.to_string(),
+            label: label.map(String::from),
+            size_bytes,
+            sha256,
+            stats,
+        })
+    }
+
+    fn backup_verify(&self, path: &std::path::Path) -> Result<crate::r#trait::BackupVerifyResult> {
+        if !path.exists() {
+            return Ok(crate::r#trait::BackupVerifyResult {
+                valid: false,
+                sha256_match: false,
+                integrity_check_pass: false,
+                error: Some(format!("file not found: {}", path.display())),
+            });
+        }
+
+        let sha256 = Self::sha256_file(path)?;
+
+        // Check for sidecar .meta.json
+        let meta_path = path.with_extension("meta.json");
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let alt_meta_path = path
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .join(format!("{stem}.meta.json"));
+
+        let sha256_match =
+            if let Some(meta_file) = [meta_path, alt_meta_path].iter().find(|p| p.exists()) {
+                if let Ok(meta_str) = std::fs::read_to_string(meta_file) {
+                    if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&meta_str) {
+                        meta["sha256"].as_str() == Some(sha256.as_str())
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+        // SQLite integrity check
+        let integrity_check_pass = match rusqlite::Connection::open(path) {
+            Ok(conn) => {
+                match conn.query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0)) {
+                    Ok(result) => result == "ok",
+                    Err(_) => false,
+                }
+            }
+            Err(_) => false,
+        };
+
+        let valid = integrity_check_pass;
+        let error = if !valid {
+            Some("SQLite integrity check failed".to_string())
+        } else {
+            None
+        };
+
+        Ok(crate::r#trait::BackupVerifyResult {
+            valid,
+            sha256_match,
+            integrity_check_pass,
+            error,
+        })
     }
 }
 

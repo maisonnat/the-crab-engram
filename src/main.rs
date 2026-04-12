@@ -126,6 +126,17 @@ enum Commands {
         #[arg(long)]
         summary: Option<String>,
     },
+    /// Create a backup of the knowledge store
+    Backup {
+        /// Optional label for the backup
+        #[arg(long)]
+        label: Option<String>,
+    },
+    /// Verify backup integrity
+    VerifyBackup {
+        /// Path to backup file
+        file: PathBuf,
+    },
     /// Version info
     Version,
     /// Start HTTP REST API server
@@ -450,6 +461,34 @@ async fn main() -> Result<()> {
             let store = open_store(cli.db)?;
             store.end_session(&session_id, summary.as_deref())?;
             println!("Session {} ended.", &session_id[..8]);
+        }
+
+        Commands::Backup { label } => {
+            let store = open_store(cli.db)?;
+            let record = store.backup_create("manual", label.as_deref())?;
+            eprintln!("Backup created: {}", record.path.display());
+            eprintln!("SHA-256: {}", record.sha256);
+            eprintln!("Size: {} bytes", record.size_bytes);
+            eprintln!("Observations: {}", record.stats.observations);
+            eprintln!("Sessions: {}", record.stats.sessions);
+            eprintln!("Edges: {}", record.stats.edges);
+        }
+
+        Commands::VerifyBackup { file } => {
+            let store = open_store(cli.db)?;
+            let result = store.backup_verify(&file)?;
+            if result.valid {
+                eprintln!("Backup VALID: {}", file.display());
+                eprintln!("SHA-256 match: {}", result.sha256_match);
+                eprintln!("Integrity check: PASS");
+            } else {
+                eprintln!("Backup INVALID: {}", file.display());
+                eprintln!("Integrity check: FAIL");
+                if let Some(err) = &result.error {
+                    eprintln!("Error: {err}");
+                }
+                std::process::exit(1);
+            }
         }
 
         Commands::Version => {
