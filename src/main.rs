@@ -10,6 +10,8 @@ use sha2::{Digest, Sha256};
 use self_update::backends::github::{Update, ReleaseList};
 use reqwest::blocking as reqwest_blocking;
 
+mod opencode_setup;
+
 /// GitHub repository owner for self-update
 const UPDATE_REPO_OWNER: &str = "maisonnat";
 /// GitHub repository name for self-update
@@ -188,6 +190,27 @@ enum Commands {
         /// Agent to configure
         #[arg(value_enum)]
         agent: AgentArg,
+        /// Profile for MCP tools (opencode only)
+        #[arg(long, default_value = "agent")]
+        profile: String,
+        /// Project name for MCP command (opencode only)
+        #[arg(long)]
+        project: Option<String>,
+        /// Remove integration instead of setting up (opencode only)
+        #[arg(long)]
+        uninstall: bool,
+        /// Show what would be done without writing (opencode only)
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Diagnose integration issues
+    Doctor {
+        /// Agent to diagnose
+        #[arg(value_enum)]
+        agent: Option<AgentArg>,
+        /// Auto-repair failures (opencode only)
+        #[arg(long)]
+        fix: bool,
     },
     /// Self-management commands (update, version)
     #[command(name = "self")]
@@ -705,32 +728,90 @@ async fn main() -> Result<()> {
             }
         }
 
-        Commands::Setup { agent } => {
-            let skill_md = generate_skill_md(&agent);
-            let agent_name = match agent {
-                AgentArg::ClaudeCode => "claude-code",
-                AgentArg::Cursor => "cursor",
-                AgentArg::GeminiCli => "gemini-cli",
-                AgentArg::Opencode => "opencode",
-            };
+        Commands::Setup {
+            agent,
+            profile,
+            project,
+            uninstall,
+            dry_run,
+        } => {
+            match agent {
+                AgentArg::Opencode => {
+                    let project_name = project.unwrap_or_else(|| cli.project.clone());
+                    let result = if uninstall {
+                        engram_mcp::opencode_paths::OpenCodePaths::detect()
+                            .map_err(|e| anyhow::anyhow!(e))
+                            .and_then(|paths| {
+                                crate::opencode_setup::uninstall_opencode(&paths, dry_run)
+                            })
+                    } else {
+                        engram_mcp::opencode_paths::OpenCodePaths::detect()
+                            .map_err(|e| anyhow::anyhow!(e))
+                            .and_then(|paths| {
+                                crate::opencode_setup::setup_opencode(
+                                    &paths,
+                                    &profile,
+                                    &project_name,
+                                    dry_run,
+                                )
+                            })
+                    };
+                    match result {
+                        Ok(r) => {
+                            r.display_table();
+                        }
+                        Err(e) => {
+                            eprintln!("Error: {e}");
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                _ => {
+                    let skill_md = generate_skill_md(&agent);
+                    let agent_name = match agent {
+                        AgentArg::ClaudeCode => "claude-code",
+                        AgentArg::Cursor => "cursor",
+                        AgentArg::GeminiCli => "gemini-cli",
+                        AgentArg::Opencode => "opencode",
+                    };
 
-            let home = dirs::home_dir().context("could not determine home directory")?;
+                    let home =
+                        dirs::home_dir().context("could not determine home directory")?;
 
-            let target_dir = match agent {
-                AgentArg::ClaudeCode => home.join(".claude").join("skills"),
-                AgentArg::Cursor => home.join(".cursor").join("rules"),
-                AgentArg::GeminiCli => home.join(".gemini").join("extensions"),
-                AgentArg::Opencode => home.join(".config").join("opencode").join("skills"),
-            };
+                    let target_dir = match agent {
+                        AgentArg::ClaudeCode => home.join(".claude").join("skills"),
+                        AgentArg::Cursor => home.join(".cursor").join("rules"),
+                        AgentArg::GeminiCli => home.join(".gemini").join("extensions"),
+                        AgentArg::Opencode => home.join(".config").join("opencode").join("skills"),
+                    };
 
-            std::fs::create_dir_all(&target_dir)?;
-            let target_file = target_dir.join("engram-memory.md");
-            std::fs::write(&target_file, &skill_md)?;
+                    std::fs::create_dir_all(&target_dir)?;
+                    let target_file = target_dir.join("engram-memory.md");
+                    std::fs::write(&target_file, &skill_md)?;
 
-            println!("✅ Setup complete for {agent_name}");
-            println!("   SKILL.md written to: {}", target_file.display());
-            println!("\nAdd this to your agent config to use The Crab Engram:");
-            println!("   the-crab-engram mcp --project <your-project>");
+                    println!("Setup complete for {agent_name}");
+                    println!("   SKILL.md written to: {}", target_file.display());
+                    println!("\nAdd this to your agent config to use The Crab Engram:");
+                    println!("   the-crab-engram mcp --project <your-project>");
+                }
+            }
+        }
+        Commands::Doctor { agent, fix } => {
+            match agent {
+                Some(AgentArg::Opencode) | None => {
+                    crate::opencode_setup::run_doctor(fix)?;
+                }
+                Some(other) => {
+                    let name = match other {
+                        AgentArg::ClaudeCode => "claude-code",
+                        AgentArg::Cursor => "cursor",
+                        AgentArg::GeminiCli => "gemini-cli",
+                        AgentArg::Opencode => "opencode",
+                    };
+                    eprintln!("Doctor command not yet supported for {name}");
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Self_ { action } => {
             match action {
@@ -894,6 +975,7 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
     }
     
     eprintln!("Update complete!");
+    Ok(())
 }
 
 /// Generate SKILL.md content for agent integration.

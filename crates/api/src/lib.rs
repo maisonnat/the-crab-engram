@@ -24,6 +24,7 @@ pub struct AppState {
 /// Create the API router.
 pub fn create_router(state: AppState) -> Router {
     Router::new()
+        .route("/health", get(health))
         .route(
             "/observations",
             get(search_observations).post(create_observation),
@@ -38,6 +39,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/stats", get(stats))
         .route("/sessions", post(create_session))
         .route("/sessions/:id", get(get_session))
+        .route("/sessions/:id/end", post(end_session))
         .route("/context", get(context))
         .route("/export", get(export))
         .route("/import", post(import))
@@ -97,6 +99,46 @@ impl IntoResponse for ApiError {
 }
 
 // ── Handlers ──────────────────────────────────────────────────────
+
+async fn health() -> impl IntoResponse {
+    Json(serde_json::json!({
+        "status": "ok",
+        "version": env!("CARGO_PKG_VERSION")
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct EndSessionRequest {
+    pub summary: Option<String>,
+}
+
+async fn end_session(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<EndSessionRequest>,
+) -> impl IntoResponse {
+    match state.store.end_session(&id, req.summary.as_deref()) {
+        Ok(()) => Json(serde_json::json!({
+            "status": "ended",
+            "session_id": id
+        }))
+        .into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("not found") {
+                (
+                    StatusCode::NOT_FOUND,
+                    Json(ApiError {
+                        error: "session not found".into(),
+                    }),
+                )
+                    .into_response()
+            } else {
+                ApiError { error: msg }.into_response()
+            }
+        }
+    }
+}
 
 async fn search_observations(
     State(state): State<AppState>,

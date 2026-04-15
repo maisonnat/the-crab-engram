@@ -224,6 +224,10 @@ GET    /antipatterns           # Detect anti-patterns
 # Sessions
 POST   /sessions               # Create session
 GET    /sessions/:id           # Get session
+POST   /sessions/:id/end       # End session with summary
+
+# Health
+GET    /health                 # Health check (returns version)
 ```
 
 Full OpenAPI spec: [`docs/openapi.yaml`](docs/openapi.yaml)
@@ -257,6 +261,7 @@ the-crab-engram tui
 | [API Reference](docs/en/api.md) | HTTP routes, MCP tools, CLI commands |
 | [Data Models](docs/en/data-models.md) | Entities, Storage trait, schema |
 | [Setup](docs/en/setup.md) | Build, run, test |
+| [OpenCode Setup](docs/en/opencode-setup.md) | One-command OpenCode integration |
 | [User Guide](docs/en/user-guide.md) | Workflows and examples |
 | [Security](docs/en/security-posture.md) | Encryption, permissions, audit |
 | [Changelog](docs/en/changelog.md) | v2.0.0 features |

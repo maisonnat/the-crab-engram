@@ -62,6 +62,9 @@ sha2 = { workspace = true }
 reqwest = { version = "0.13", features = ["blocking", "rustls"], default-features = false }
 self_update = { version = "0.44.0", features = ["reqwest", "rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"], default-features = false }
 
+[dev-dependencies]
+tempfile = "3"
+
 [profile.release]
 lto = true
 codegen-units = 1
