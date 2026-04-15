@@ -2,6 +2,8 @@
 /target/
 **/target/
 **/*.rs.bk
+*.rlib
+*.prof*
 Cargo.lock
 
 # IDE
@@ -14,6 +16,10 @@ Cargo.lock
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment
+.env*
+*.log
 
 # Engram
 *.db
