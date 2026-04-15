@@ -6,9 +6,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use engram_core::{ObservationType, Scope};
 use engram_mcp::{EngramConfig, EngramServer, ToolProfile};
 use engram_store::{AddObservationParams, SearchOptions, SqliteStore, Storage};
-use sha2::{Digest, Sha256};
-use self_update::backends::github::{Update, ReleaseList};
 use reqwest::blocking as reqwest_blocking;
+use self_update::backends::github::{ReleaseList, Update};
+use sha2::{Digest, Sha256};
 
 mod opencode_setup;
 
@@ -545,7 +545,12 @@ async fn main() -> Result<()> {
             }
         }
 
-        Commands::Restore { list, id, file, yes } => {
+        Commands::Restore {
+            list,
+            id,
+            file,
+            yes,
+        } => {
             let store = open_store(cli.db)?;
 
             // BACKUP-03: List backups
@@ -555,7 +560,10 @@ async fn main() -> Result<()> {
                     eprintln!("No backups found.");
                     return Ok(());
                 }
-                eprintln!("{:<4} {:<22} {:<10} {:<20} {:<10} SHA-256", "#", "Created", "Trigger", "Label", "Size");
+                eprintln!(
+                    "{:<4} {:<22} {:<10} {:<20} {:<10} SHA-256",
+                    "#", "Created", "Trigger", "Label", "Size"
+                );
                 eprintln!("{}", "-".repeat(90));
                 for (i, b) in backups.iter().enumerate() {
                     let label = b.label.as_deref().unwrap_or("");
@@ -579,7 +587,10 @@ async fn main() -> Result<()> {
                 // BACKUP-04: Restore by ID
                 let backups = store.backup_list()?;
                 if id == 0 || id > backups.len() {
-                    anyhow::bail!("Invalid backup ID {}. Use --list to see available backups.", id);
+                    anyhow::bail!(
+                        "Invalid backup ID {}. Use --list to see available backups.",
+                        id
+                    );
                 }
                 backups[id - 1].path.clone()
             } else if let Some(ref path) = file {
@@ -734,101 +745,97 @@ async fn main() -> Result<()> {
             project,
             uninstall,
             dry_run,
-        } => {
-            match agent {
-                AgentArg::Opencode => {
-                    let project_name = project.unwrap_or_else(|| cli.project.clone());
-                    let result = if uninstall {
-                        engram_mcp::opencode_paths::OpenCodePaths::detect()
-                            .map_err(|e| anyhow::anyhow!(e))
-                            .and_then(|paths| {
-                                crate::opencode_setup::uninstall_opencode(&paths, dry_run)
-                            })
-                    } else {
-                        engram_mcp::opencode_paths::OpenCodePaths::detect()
-                            .map_err(|e| anyhow::anyhow!(e))
-                            .and_then(|paths| {
-                                crate::opencode_setup::setup_opencode(
-                                    &paths,
-                                    &profile,
-                                    &project_name,
-                                    dry_run,
-                                )
-                            })
-                    };
-                    match result {
-                        Ok(r) => {
-                            r.display_table();
-                        }
-                        Err(e) => {
-                            eprintln!("Error: {e}");
-                            std::process::exit(1);
-                        }
+        } => match agent {
+            AgentArg::Opencode => {
+                let project_name = project.unwrap_or_else(|| cli.project.clone());
+                let result = if uninstall {
+                    engram_mcp::opencode_paths::OpenCodePaths::detect()
+                        .map_err(|e| anyhow::anyhow!(e))
+                        .and_then(|paths| {
+                            crate::opencode_setup::uninstall_opencode(&paths, dry_run)
+                        })
+                } else {
+                    engram_mcp::opencode_paths::OpenCodePaths::detect()
+                        .map_err(|e| anyhow::anyhow!(e))
+                        .and_then(|paths| {
+                            crate::opencode_setup::setup_opencode(
+                                &paths,
+                                &profile,
+                                &project_name,
+                                dry_run,
+                            )
+                        })
+                };
+                match result {
+                    Ok(r) => {
+                        r.display_table();
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {e}");
+                        std::process::exit(1);
                     }
                 }
-                _ => {
-                    let skill_md = generate_skill_md(&agent);
-                    let agent_name = match agent {
-                        AgentArg::ClaudeCode => "claude-code",
-                        AgentArg::Cursor => "cursor",
-                        AgentArg::GeminiCli => "gemini-cli",
-                        AgentArg::Opencode => "opencode",
-                    };
-
-                    let home =
-                        dirs::home_dir().context("could not determine home directory")?;
-
-                    let target_dir = match agent {
-                        AgentArg::ClaudeCode => home.join(".claude").join("skills"),
-                        AgentArg::Cursor => home.join(".cursor").join("rules"),
-                        AgentArg::GeminiCli => home.join(".gemini").join("extensions"),
-                        AgentArg::Opencode => home.join(".config").join("opencode").join("skills"),
-                    };
-
-                    std::fs::create_dir_all(&target_dir)?;
-                    let target_file = target_dir.join("engram-memory.md");
-                    std::fs::write(&target_file, &skill_md)?;
-
-                    println!("Setup complete for {agent_name}");
-                    println!("   SKILL.md written to: {}", target_file.display());
-                    println!("\nAdd this to your agent config to use The Crab Engram:");
-                    println!("   the-crab-engram mcp --project <your-project>");
-                }
             }
-        }
-        Commands::Doctor { agent, fix } => {
-            match agent {
-                Some(AgentArg::Opencode) | None => {
-                    crate::opencode_setup::run_doctor(fix).await?;
-                }
-                Some(other) => {
-                    let name = match other {
-                        AgentArg::ClaudeCode => "claude-code",
-                        AgentArg::Cursor => "cursor",
-                        AgentArg::GeminiCli => "gemini-cli",
-                        AgentArg::Opencode => "opencode",
-                    };
-                    eprintln!("Doctor command not yet supported for {name}");
-                    std::process::exit(1);
-                }
-            }
-        }
-        Commands::Self_ { action } => {
-            match action {
-                SelfAction::Update { check_only, dry_run } => {
-                    handle_self_update(check_only, dry_run)?;
-                }
-                SelfAction::Version => {
-                    let version = env!("CARGO_PKG_VERSION");
-                    let hash = env!("GIT_HASH");
-                    let date = env!("GIT_DATE");
+            _ => {
+                let skill_md = generate_skill_md(&agent);
+                let agent_name = match agent {
+                    AgentArg::ClaudeCode => "claude-code",
+                    AgentArg::Cursor => "cursor",
+                    AgentArg::GeminiCli => "gemini-cli",
+                    AgentArg::Opencode => "opencode",
+                };
 
-                    eprintln!("the-crab-engram {version} ({hash} {date})");
-                    eprintln!("https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}");
-                    eprintln!("update: run `the-crab-engram self update` to check for updates");
-                }
+                let home = dirs::home_dir().context("could not determine home directory")?;
+
+                let target_dir = match agent {
+                    AgentArg::ClaudeCode => home.join(".claude").join("skills"),
+                    AgentArg::Cursor => home.join(".cursor").join("rules"),
+                    AgentArg::GeminiCli => home.join(".gemini").join("extensions"),
+                    AgentArg::Opencode => home.join(".config").join("opencode").join("skills"),
+                };
+
+                std::fs::create_dir_all(&target_dir)?;
+                let target_file = target_dir.join("engram-memory.md");
+                std::fs::write(&target_file, &skill_md)?;
+
+                println!("Setup complete for {agent_name}");
+                println!("   SKILL.md written to: {}", target_file.display());
+                println!("\nAdd this to your agent config to use The Crab Engram:");
+                println!("   the-crab-engram mcp --project <your-project>");
             }
-        }
+        },
+        Commands::Doctor { agent, fix } => match agent {
+            Some(AgentArg::Opencode) | None => {
+                crate::opencode_setup::run_doctor(fix).await?;
+            }
+            Some(other) => {
+                let name = match other {
+                    AgentArg::ClaudeCode => "claude-code",
+                    AgentArg::Cursor => "cursor",
+                    AgentArg::GeminiCli => "gemini-cli",
+                    AgentArg::Opencode => "opencode",
+                };
+                eprintln!("Doctor command not yet supported for {name}");
+                std::process::exit(1);
+            }
+        },
+        Commands::Self_ { action } => match action {
+            SelfAction::Update {
+                check_only,
+                dry_run,
+            } => {
+                handle_self_update(check_only, dry_run)?;
+            }
+            SelfAction::Version => {
+                let version = env!("CARGO_PKG_VERSION");
+                let hash = env!("GIT_HASH");
+                let date = env!("GIT_DATE");
+
+                eprintln!("the-crab-engram {version} ({hash} {date})");
+                eprintln!("https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}");
+                eprintln!("update: run `the-crab-engram self update` to check for updates");
+            }
+        },
     }
 
     Ok(())
@@ -836,7 +843,7 @@ async fn main() -> Result<()> {
 
 fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
     let current_version = self_update::cargo_crate_version!();
-    
+
     // Fetch latest release info
     let releases = ReleaseList::configure()
         .repo_owner(UPDATE_REPO_OWNER)
@@ -845,30 +852,30 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
         .context("Failed to configure release list")?
         .fetch()
         .context("Failed to fetch latest release")?;
-    
+
     let latest_release = releases
         .first()
         .ok_or_else(|| anyhow::anyhow!("No releases found"))?;
     let latest_version = &latest_release.version;
-    
+
     // Check-only mode: print comparison and exit
     if check_only {
         eprintln!("Latest: v{latest_version} (current: v{current_version})");
         return Ok(());
     }
-    
+
     // Dry-run mode: show what would happen
     if dry_run {
         eprintln!("Would update from v{current_version} to v{latest_version}");
         return Ok(());
     }
-    
+
     // Already up-to-date?
     if latest_version == current_version {
         eprintln!("Already on the latest version (v{current_version})");
         return Ok(());
     }
-    
+
     // Perform update
     let status = Update::configure()
         .repo_owner(UPDATE_REPO_OWNER)
@@ -880,7 +887,7 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
         .context("Failed to configure update")?
         .update()
         .context("Failed to perform update")?;
-    
+
     let updated_version = match status {
         self_update::Status::UpToDate(v) => {
             eprintln!("Already on the latest version (v{v})");
@@ -891,7 +898,7 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
             v
         }
     };
-    
+
     // Post-update binary size verification (Windows 0-byte bug)
     let exe = std::env::current_exe()?;
     let meta = std::fs::metadata(&exe)?;
@@ -901,7 +908,7 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
         eprintln!("  https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}/releases/latest");
         std::process::exit(1);
     }
-    
+
     // SHA-256 checksum verification (UPDATE-03)
     let mut file = std::fs::File::open(&exe)?;
     let mut hasher = Sha256::new();
@@ -912,7 +919,7 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
         .map(|b| format!("{:02x}", b))
         .collect::<String>();
     eprintln!("Binary SHA-256: {}", computed_hash_hex);
-    
+
     // Fetch and verify checksums from the release
     let checksum_url = format!(
         "https://github.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}/releases/download/v{updated_version}/checksums-sha256.txt"
@@ -928,33 +935,42 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
                         format!("{BIN_NAME}-{updated_version}-{target}.tar.gz"),
                         format!("{BIN_NAME}-{updated_version}-{target}.zip"),
                     ];
-                    
+
                     let mut found = false;
                     for line in body.lines() {
                         let line = line.trim();
-                        if line.is_empty() { continue; }
-                        
+                        if line.is_empty() {
+                            continue;
+                        }
+
                         // sha256sum format: "hash  filename" (two spaces)
                         let parts: Vec<&str> = line.splitn(2, "  ").collect();
-                        if parts.len() != 2 { continue; }
-                        
+                        if parts.len() != 2 {
+                            continue;
+                        }
+
                         let expected_hash = parts[0].trim();
                         let filename = parts[1].trim();
-                        
+
                         // Check if this entry matches our archive
                         if archive_patterns.iter().any(|p| filename == p) {
                             found = true;
                             eprintln!("Checksum entry found: {}", filename);
                             eprintln!("  Archive SHA-256: {}", expected_hash);
                             eprintln!("  Binary SHA-256:  {} (for reference)", computed_hash_hex);
-                            eprintln!("  Integrity: verified via HTTPS transport + archive checksum");
+                            eprintln!(
+                                "  Integrity: verified via HTTPS transport + archive checksum"
+                            );
                             break;
                         }
                     }
-                    
+
                     if !found {
                         eprintln!("Note: No checksum entry found for target {target}");
-                        eprintln!("  Binary SHA-256: {} (logged for reference)", computed_hash_hex);
+                        eprintln!(
+                            "  Binary SHA-256: {} (logged for reference)",
+                            computed_hash_hex
+                        );
                         eprintln!("  Integrity: verified via HTTPS transport");
                     }
                 }
@@ -965,7 +981,10 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
             }
         }
         Ok(response) => {
-            eprintln!("Warning: Checksums file not available (HTTP {})", response.status());
+            eprintln!(
+                "Warning: Checksums file not available (HTTP {})",
+                response.status()
+            );
             eprintln!("  Binary SHA-256: {computed_hash_hex} (logged for reference)");
         }
         Err(e) => {
@@ -973,7 +992,7 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
             eprintln!("  Binary SHA-256: {computed_hash_hex} (logged for reference)");
         }
     }
-    
+
     eprintln!("Update complete!");
     Ok(())
 }

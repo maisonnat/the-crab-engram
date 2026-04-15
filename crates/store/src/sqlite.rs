@@ -4,9 +4,9 @@ use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 use engram_core::{
-    classify_query_type, decay_score_with_lifecycle, Attachment, Edge, EngramError,
-    KnowledgeCapsule, LifecycleState, Observation, ObservationType, ProvenanceSource, QueryTarget,
-    RelationType, Scope, Session,
+    Attachment, Edge, EngramError, KnowledgeCapsule, LifecycleState, Observation, ObservationType,
+    ProvenanceSource, QueryTarget, RelationType, Scope, Session, classify_query_type,
+    decay_score_with_lifecycle,
 };
 use rusqlite::OptionalExtension;
 use tracing::info;
@@ -1994,12 +1994,12 @@ impl SqliteStore {
 
             // Check .meta.json for trigger
             let meta_path = path.with_extension("meta.json");
-            if let Ok(meta_str) = std::fs::read_to_string(&meta_path) {
-                if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&meta_str) {
-                    let trigger = meta["trigger"].as_str().unwrap_or("unknown");
-                    if trigger != "manual" {
-                        auto_backups.push(entry);
-                    }
+            if let Ok(meta_str) = std::fs::read_to_string(&meta_path)
+                && let Ok(meta) = serde_json::from_str::<serde_json::Value>(&meta_str)
+            {
+                let trigger = meta["trigger"].as_str().unwrap_or("unknown");
+                if trigger != "manual" {
+                    auto_backups.push(entry);
                 }
             }
         }

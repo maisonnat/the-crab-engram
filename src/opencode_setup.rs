@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use engram_mcp::config_merge::{
-    self, generate_memory_protocol, merge_agents_md, ActionKind, SetupAction, SetupResult,
+    self, ActionKind, SetupAction, SetupResult, generate_memory_protocol, merge_agents_md,
 };
 use engram_mcp::doctor::{self, CheckResult, CheckStatus, DoctorCheck};
 use engram_mcp::opencode_paths::OpenCodePaths;
@@ -431,7 +431,7 @@ fn check_database() -> CheckResult {
                 status: CheckStatus::Fail,
                 message: "Cannot determine home directory".to_string(),
                 fix_command: None,
-            }
+            };
         }
     };
     let db_path = home.join(".engram").join("engram.db");
