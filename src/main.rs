@@ -555,7 +555,7 @@ async fn main() -> Result<()> {
                     eprintln!("No backups found.");
                     return Ok(());
                 }
-                eprintln!("{:<4} {:<22} {:<10} {:<20} {:<10} {}", "#", "Created", "Trigger", "Label", "Size", "SHA-256");
+                eprintln!("{:<4} {:<22} {:<10} {:<20} {:<10} SHA-256", "#", "Created", "Trigger", "Label", "Size");
                 eprintln!("{}", "-".repeat(90));
                 for (i, b) in backups.iter().enumerate() {
                     let label = b.label.as_deref().unwrap_or("");
@@ -799,7 +799,7 @@ async fn main() -> Result<()> {
         Commands::Doctor { agent, fix } => {
             match agent {
                 Some(AgentArg::Opencode) | None => {
-                    crate::opencode_setup::run_doctor(fix)?;
+                    crate::opencode_setup::run_doctor(fix).await?;
                 }
                 Some(other) => {
                     let name = match other {
