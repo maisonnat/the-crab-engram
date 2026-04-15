@@ -22,7 +22,7 @@ pub struct SetupResult {
 
 impl SetupResult {
     pub fn display_table(&self) {
-        println!("{:<12} {:<50} {}", "ACTION", "TARGET", "DETAIL");
+        println!("{:<12} {:<50} DETAIL", "ACTION", "TARGET");
         println!("{}", "-".repeat(80));
         for a in &self.actions {
             let kind = match a.action {
@@ -58,7 +58,7 @@ pub fn strip_jsonc_comments(input: &str) -> String {
                     result.push(c);
                 }
                 '/' if chars.peek() == Some(&'/') => {
-                    while let Some(nc) = chars.next() {
+                    for nc in chars.by_ref() {
                         if nc == '\n' {
                             result.push('\n');
                             break;
@@ -100,19 +100,19 @@ pub fn merge_mcp_entry(
 pub fn remove_mcp_entry(config: &serde_json::Value) -> serde_json::Value {
     let mut config = config.clone();
     if let Some(obj) = config.as_object_mut() {
-        if let Some(mcp) = obj.get_mut("mcp") {
-            if let Some(mcp_obj) = mcp.as_object_mut() {
-                mcp_obj.remove("the-crab-engram");
-            }
+        if let Some(mcp) = obj.get_mut("mcp")
+            && let Some(mcp_obj) = mcp.as_object_mut()
+        {
+            mcp_obj.remove("the-crab-engram");
         }
-        if let Some(plugin) = obj.get_mut("plugin") {
-            if let Some(arr) = plugin.as_array_mut() {
-                arr.retain(|v| {
-                    v.as_str()
-                        .map(|s| !s.contains("the-crab-engram"))
-                        .unwrap_or(true)
-                });
-            }
+        if let Some(plugin) = obj.get_mut("plugin")
+            && let Some(arr) = plugin.as_array_mut()
+        {
+            arr.retain(|v| {
+                v.as_str()
+                    .map(|s| !s.contains("the-crab-engram"))
+                    .unwrap_or(true)
+            });
         }
     }
     config

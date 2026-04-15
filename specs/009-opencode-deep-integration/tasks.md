@@ -174,7 +174,7 @@
 - [X] T035 [P] Update `README.md` agent setup table with OpenCode one-liner
 - [X] T036 Validate cross-platform paths: test on Windows (`%APPDATA%`), verify `dirs::config_dir()` resolution on Linux/macOS
 - [X] T037 [P] Run `cargo clippy` and `cargo test` to ensure no warnings or regressions
-- [ ] T038 Validate quickstart.md end-to-end: `setup opencode` → `doctor opencode` → open OpenCode → verify plugin loads
+- [X] T038 Validate quickstart.md end-to-end: `setup opencode` → `doctor opencode` → open OpenCode → verify plugin loads
 
 ---
 

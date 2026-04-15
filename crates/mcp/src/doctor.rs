@@ -124,7 +124,7 @@ pub fn check_server_running() -> CheckResult {
 }
 
 pub fn display_results(results: &[CheckResult]) {
-    println!("{:<25} {:<8} {}", "CHECK", "STATUS", "MESSAGE");
+    println!("{:<25} {:<8} MESSAGE", "CHECK", "STATUS");
     println!("{}", "-".repeat(70));
     for r in results {
         let symbol = match r.status {

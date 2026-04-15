@@ -258,155 +258,168 @@ pub fn uninstall_opencode(paths: &OpenCodePaths, dry_run: bool) -> Result<SetupR
     Ok(SetupResult { actions })
 }
 
-pub fn run_doctor(fix: bool) -> Result<()> {
-    let mut results = Vec::new();
+pub async fn run_doctor(fix: bool) -> Result<()> {
+    let mut attempt = 0;
+    loop {
+        if attempt > 0 {
+            eprintln!("\nRe-running checks...\n");
+        }
+        let mut results = Vec::new();
 
-    let bin_result = doctor::check_binary_in_path();
-    results.push(bin_result);
+        let bin_result = doctor::check_binary_in_path();
+        results.push(bin_result);
 
-    let oc_result = doctor::check_opencode_installed();
-    results.push(oc_result);
+        let oc_result = doctor::check_opencode_installed();
+        results.push(oc_result);
 
-    let paths_result = OpenCodePaths::detect();
-    match &paths_result {
-        Ok(paths) => {
-            if paths.config_file.exists() {
-                results.push(CheckResult {
-                    name: DoctorCheck::ConfigExists.name().to_string(),
-                    status: CheckStatus::Pass,
-                    message: paths.config_file.display().to_string(),
-                    fix_command: None,
-                });
+        let paths_result = OpenCodePaths::detect();
+        match &paths_result {
+            Ok(paths) => {
+                if paths.config_file.exists() {
+                    results.push(CheckResult {
+                        name: DoctorCheck::ConfigExists.name().to_string(),
+                        status: CheckStatus::Pass,
+                        message: paths.config_file.display().to_string(),
+                        fix_command: None,
+                    });
 
-                let raw = std::fs::read_to_string(&paths.config_file)?;
-                let clean = if paths.is_jsonc {
-                    config_merge::strip_jsonc_comments(&raw)
+                    let raw = std::fs::read_to_string(&paths.config_file)?;
+                    let clean = if paths.is_jsonc {
+                        config_merge::strip_jsonc_comments(&raw)
+                    } else {
+                        raw.clone()
+                    };
+                    match serde_json::from_str::<serde_json::Value>(&clean) {
+                        Ok(config) => {
+                            let has_mcp = config
+                                .get("mcp")
+                                .and_then(|m| m.get("the-crab-engram"))
+                                .is_some();
+                            results.push(CheckResult {
+                                name: DoctorCheck::McpEntryValid.name().to_string(),
+                                status: if has_mcp {
+                                    CheckStatus::Pass
+                                } else {
+                                    CheckStatus::Fail
+                                },
+                                message: if has_mcp {
+                                    "the-crab-engram registered".to_string()
+                                } else {
+                                    "the-crab-engram MCP entry missing".to_string()
+                                },
+                                fix_command: if has_mcp {
+                                    None
+                                } else {
+                                    Some("the-crab-engram setup opencode".to_string())
+                                },
+                            });
+                        }
+                        Err(e) => {
+                            results.push(CheckResult {
+                                name: DoctorCheck::McpEntryValid.name().to_string(),
+                                status: CheckStatus::Fail,
+                                message: format!("Config parse error: {e}"),
+                                fix_command: Some("Fix or delete opencode.json".to_string()),
+                            });
+                        }
+                    }
                 } else {
-                    raw.clone()
-                };
-                match serde_json::from_str::<serde_json::Value>(&clean) {
-                    Ok(config) => {
-                        let has_mcp = config
-                            .get("mcp")
-                            .and_then(|m| m.get("the-crab-engram"))
-                            .is_some();
-                        results.push(CheckResult {
-                            name: DoctorCheck::McpEntryValid.name().to_string(),
-                            status: if has_mcp {
-                                CheckStatus::Pass
-                            } else {
-                                CheckStatus::Fail
-                            },
-                            message: if has_mcp {
-                                "the-crab-engram registered".to_string()
-                            } else {
-                                "the-crab-engram MCP entry missing".to_string()
-                            },
-                            fix_command: if has_mcp {
-                                None
-                            } else {
-                                Some("the-crab-engram setup opencode".to_string())
-                            },
-                        });
-                    }
-                    Err(e) => {
-                        results.push(CheckResult {
-                            name: DoctorCheck::McpEntryValid.name().to_string(),
-                            status: CheckStatus::Fail,
-                            message: format!("Config parse error: {e}"),
-                            fix_command: Some("Fix or delete opencode.json".to_string()),
-                        });
-                    }
+                    results.push(CheckResult {
+                        name: DoctorCheck::ConfigExists.name().to_string(),
+                        status: CheckStatus::Fail,
+                        message: "Config file not found".to_string(),
+                        fix_command: Some("the-crab-engram setup opencode".to_string()),
+                    });
+                    results.push(CheckResult {
+                        name: DoctorCheck::McpEntryValid.name().to_string(),
+                        status: CheckStatus::Fail,
+                        message: "No config file".to_string(),
+                        fix_command: Some("the-crab-engram setup opencode".to_string()),
+                    });
                 }
-            } else {
+
+                let plugin_path = paths.plugin_dir.join("the-crab-engram.ts");
+                if plugin_path.exists() {
+                    results.push(CheckResult {
+                        name: DoctorCheck::PluginExists.name().to_string(),
+                        status: CheckStatus::Pass,
+                        message: plugin_path.display().to_string(),
+                        fix_command: None,
+                    });
+                } else {
+                    results.push(CheckResult {
+                        name: DoctorCheck::PluginExists.name().to_string(),
+                        status: CheckStatus::Fail,
+                        message: "Plugin file not found".to_string(),
+                        fix_command: Some("the-crab-engram setup opencode".to_string()),
+                    });
+                }
+            }
+            Err(e) => {
                 results.push(CheckResult {
                     name: DoctorCheck::ConfigExists.name().to_string(),
                     status: CheckStatus::Fail,
-                    message: "Config file not found".to_string(),
-                    fix_command: Some("the-crab-engram setup opencode".to_string()),
+                    message: format!("Cannot detect paths: {e}"),
+                    fix_command: None,
                 });
                 results.push(CheckResult {
                     name: DoctorCheck::McpEntryValid.name().to_string(),
                     status: CheckStatus::Fail,
-                    message: "No config file".to_string(),
-                    fix_command: Some("the-crab-engram setup opencode".to_string()),
-                });
-            }
-
-            let plugin_path = paths.plugin_dir.join("the-crab-engram.ts");
-            if plugin_path.exists() {
-                results.push(CheckResult {
-                    name: DoctorCheck::PluginExists.name().to_string(),
-                    status: CheckStatus::Pass,
-                    message: plugin_path.display().to_string(),
+                    message: "Cannot check (no paths)".to_string(),
                     fix_command: None,
                 });
-            } else {
                 results.push(CheckResult {
                     name: DoctorCheck::PluginExists.name().to_string(),
                     status: CheckStatus::Fail,
-                    message: "Plugin file not found".to_string(),
-                    fix_command: Some("the-crab-engram setup opencode".to_string()),
+                    message: "Cannot check (no paths)".to_string(),
+                    fix_command: None,
                 });
             }
         }
-        Err(e) => {
-            results.push(CheckResult {
-                name: DoctorCheck::ConfigExists.name().to_string(),
+
+        let server_result = tokio::task::spawn_blocking(doctor::check_server_running)
+            .await
+            .unwrap_or_else(|_| CheckResult {
+                name: DoctorCheck::ServerRunning.name().to_string(),
                 status: CheckStatus::Fail,
-                message: format!("Cannot detect paths: {e}"),
-                fix_command: None,
+                message: "Health check task panicked".to_string(),
+                fix_command: Some("the-crab-engram serve --port 7437".to_string()),
             });
-            results.push(CheckResult {
-                name: DoctorCheck::McpEntryValid.name().to_string(),
-                status: CheckStatus::Fail,
-                message: "Cannot check (no paths)".to_string(),
-                fix_command: None,
-            });
-            results.push(CheckResult {
-                name: DoctorCheck::PluginExists.name().to_string(),
-                status: CheckStatus::Fail,
-                message: "Cannot check (no paths)".to_string(),
-                fix_command: None,
-            });
-        }
-    }
+        results.push(server_result);
 
-    let server_result = doctor::check_server_running();
-    results.push(server_result);
+        let db_result = check_database();
+        results.push(db_result);
 
-    let db_result = check_database();
-    results.push(db_result);
+        doctor::display_results(&results);
 
-    doctor::display_results(&results);
+        let all_ok = doctor::all_passed(&results);
 
-    let all_ok = doctor::all_passed(&results);
-
-    if !all_ok && fix {
-        eprintln!("\nAttempting auto-repair...");
-        if let Ok(paths) = paths_result {
-            match setup_opencode(&paths, "agent", "default", false) {
-                Ok(result) => {
-                    for action in &result.actions {
-                        if action.action != ActionKind::Skipped {
-                            eprintln!("  Fixed: {} - {}", action.target, action.detail);
+        if !all_ok && fix && attempt == 0 {
+            eprintln!("\nAttempting auto-repair...");
+            if let Ok(paths) = paths_result {
+                match setup_opencode(&paths, "agent", "default", false) {
+                    Ok(result) => {
+                        for action in &result.actions {
+                            if action.action != ActionKind::Skipped {
+                                eprintln!("  Fixed: {} - {}", action.target, action.detail);
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    eprintln!("  Auto-repair failed: {e}");
+                    Err(e) => {
+                        eprintln!("  Auto-repair failed: {e}");
+                    }
                 }
             }
+            attempt += 1;
+            continue;
         }
-        eprintln!("\nRe-running checks...\n");
-        return run_doctor(false);
-    }
 
-    if !all_ok {
-        std::process::exit(1);
-    }
+        if !all_ok {
+            std::process::exit(1);
+        }
 
-    Ok(())
+        return Ok(());
+    }
 }
 
 fn check_database() -> CheckResult {
