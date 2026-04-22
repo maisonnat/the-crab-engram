@@ -30,7 +30,7 @@ pub fn create_router(state: AppState) -> Router {
             get(search_observations).post(create_observation),
         )
         .route(
-            "/observations/:id",
+            "/observations/{id}",
             get(get_observation)
                 .put(update_observation)
                 .delete(delete_observation),
@@ -38,15 +38,15 @@ pub fn create_router(state: AppState) -> Router {
         .route("/search", post(search))
         .route("/stats", get(stats))
         .route("/sessions", post(create_session))
-        .route("/sessions/:id", get(get_session))
-        .route("/sessions/:id/end", post(end_session))
+        .route("/sessions/{id}", get(get_session))
+        .route("/sessions/{id}/end", post(end_session))
         .route("/context", get(context))
         .route("/export", get(export))
         .route("/import", post(import))
         .route("/capsules", get(list_capsules))
-        .route("/capsules/:topic", get(get_capsule))
+        .route("/capsules/{topic}", get(get_capsule))
         .route("/consolidate", post(consolidate))
-        .route("/graph/:id", get(graph_edges))
+        .route("/graph/{id}", get(graph_edges))
         .route("/inject", post(inject))
         .route("/antipatterns", get(antipatterns))
         // Hermes memory provider endpoints
