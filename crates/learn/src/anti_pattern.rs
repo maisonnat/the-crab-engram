@@ -92,7 +92,7 @@ impl AntiPatternDetector {
         patterns.extend(self.detect_unverified_decisions(project, 0.7)?);
 
         // Sort by severity descending
-        patterns.sort_by(|a, b| b.severity.cmp(&a.severity));
+        patterns.sort_by_key(|b| std::cmp::Reverse(b.severity));
 
         Ok(patterns)
     }

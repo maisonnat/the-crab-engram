@@ -118,10 +118,10 @@ impl InferenceEngine {
 
     /// Unload the model from memory, freeing resources.
     pub fn unload(&self) {
-        if let Ok(mut guard) = self.model.lock() {
-            if guard.take().is_some() {
-                info!("Model unloaded, memory released");
-            }
+        if let Ok(mut guard) = self.model.lock()
+            && guard.take().is_some()
+        {
+            info!("Model unloaded, memory released");
         }
     }
 

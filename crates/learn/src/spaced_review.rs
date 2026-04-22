@@ -59,7 +59,7 @@ pub fn bootstrap_reviews(
     count: usize,
 ) -> Vec<SpacedRepetition> {
     let mut sorted = observation_ids_with_access.to_vec();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1)); // Sort by access_count descending
+    sorted.sort_by_key(|b| std::cmp::Reverse(b.1)); // Sort by access_count descending
 
     sorted
         .into_iter()

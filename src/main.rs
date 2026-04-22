@@ -1069,7 +1069,7 @@ fn build_export_context(store: &dyn Storage, project: &str, max_tokens: usize) -
 
     // Top observations by access count
     let mut all_obs = ctx.observations;
-    all_obs.sort_by(|a, b| b.access_count.cmp(&a.access_count));
+    all_obs.sort_by_key(|b| std::cmp::Reverse(b.access_count));
 
     if !all_obs.is_empty() {
         md.push_str("## 🔥 Most Used Knowledge\n\n");

@@ -227,32 +227,31 @@ fn clean_json_output(raw: &str) -> String {
     let trimmed = raw.trim();
 
     // If wrapped in ```json ... ```, extract just the JSON
-    if let Some(start) = trimmed.find("```json") {
-        if let Some(end) = trimmed.rfind("```") {
-            let json_start = start + 7; // len of "```json"
-            if json_start < end {
-                return trimmed[json_start..end].trim().to_string();
-            }
+    if let Some(start) = trimmed.find("```json")
+        && let Some(end) = trimmed.rfind("```")
+    {
+        let json_start = start + 7; // len of "```json"
+        if json_start < end {
+            return trimmed[json_start..end].trim().to_string();
         }
     }
 
     // If wrapped in ``` ... ```
-    if let Some(start) = trimmed.find("```") {
-        if let Some(end) = trimmed.rfind("```") {
-            let json_start = start + 3;
-            if json_start < end {
-                return trimmed[json_start..end].trim().to_string();
-            }
+    if let Some(start) = trimmed.find("```")
+        && let Some(end) = trimmed.rfind("```")
+    {
+        let json_start = start + 3;
+        if json_start < end {
+            return trimmed[json_start..end].trim().to_string();
         }
     }
 
     // Try to find JSON object bounds
-    if let Some(start) = trimmed.find('{') {
-        if let Some(end) = trimmed.rfind('}') {
-            if start < end {
-                return trimmed[start..=end].to_string();
-            }
-        }
+    if let Some(start) = trimmed.find('{')
+        && let Some(end) = trimmed.rfind('}')
+        && start < end
+    {
+        return trimmed[start..=end].to_string();
     }
 
     trimmed.to_string()

@@ -44,10 +44,8 @@ pub fn run_tui(store: SqliteStore, project: &str) -> anyhow::Result<()> {
                     app.state = AppState::Boundaries;
                     app.refresh_boundaries();
                 }
-                KeyCode::Backspace => {
-                    if app.state == AppState::Search {
-                        app.search_query.pop();
-                    }
+                KeyCode::Backspace if app.state == AppState::Search => {
+                    app.search_query.pop();
                 }
                 KeyCode::Enter => {
                     if app.state == AppState::Search && !app.search_query.is_empty() {
@@ -58,15 +56,13 @@ pub fn run_tui(store: SqliteStore, project: &str) -> anyhow::Result<()> {
                             app.search_results.get(app.selected_index).cloned();
                     }
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    if app.selected_index > 0 {
-                        app.selected_index -= 1;
-                    }
+                KeyCode::Up | KeyCode::Char('k') if app.selected_index > 0 => {
+                    app.selected_index -= 1;
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    if app.selected_index < app.search_results.len().saturating_sub(1) {
-                        app.selected_index += 1;
-                    }
+                KeyCode::Down | KeyCode::Char('j')
+                    if app.selected_index < app.search_results.len().saturating_sub(1) =>
+                {
+                    app.selected_index += 1;
                 }
                 KeyCode::Esc => {
                     app.state = AppState::Dashboard;
