@@ -188,7 +188,7 @@ impl std::fmt::Debug for Embedder {
 ///
 /// Reference: HuggingFace Research — Binary and Scalar Embedding Quantization
 pub fn binary_quantize(vec: &[f32]) -> Vec<u8> {
-    let byte_count = (vec.len() + 7) / 8;
+    let byte_count = vec.len().div_ceil(8);
     let mut packed = vec![0u8; byte_count];
 
     for (i, &val) in vec.iter().enumerate() {
