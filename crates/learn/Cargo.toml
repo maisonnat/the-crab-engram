@@ -3,6 +3,14 @@ name = "engram-learn"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+# Local inference via llama.cpp — requires cmake and a C++ compiler
+inference = ["llama_cpp_rs"]
+# GPU acceleration backends
+cuda = ["llama_cpp_rs/cuda"]
+metal = ["llama_cpp_rs/metal"]
+
 [dependencies]
 engram-core = { workspace = true }
 engram-store = { workspace = true }
@@ -12,3 +20,4 @@ serde_json = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
+llama_cpp_rs = { version = "0.3", optional = true }

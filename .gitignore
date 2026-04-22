@@ -34,3 +34,4 @@ engram-chunks/
 *.dll
 *.so
 *.dylib
+.aider*

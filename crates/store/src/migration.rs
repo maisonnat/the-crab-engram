@@ -62,6 +62,14 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 16,
         sql: include_str!("migrations/016_entities.sql"),
     },
+    Migration {
+        version: 17,
+        sql: include_str!("migrations/017_bitemporal.sql"),
+    },
+    Migration {
+        version: 18,
+        sql: include_str!("migrations/018_binary_embeddings.sql"),
+    },
 ];
 
 /// Run all pending migrations on a connection.
@@ -159,6 +167,7 @@ fn fix_schema_compat(conn: &rusqlite::Connection) -> crate::Result<()> {
         ("provenance_evidence", "TEXT DEFAULT '[]'"),
         ("pinned", "INTEGER NOT NULL DEFAULT 0"),
         ("normalized_hash", "TEXT NOT NULL DEFAULT ''"),
+        ("recorded_at", "TEXT NOT NULL DEFAULT ''"),
     ];
 
     for (col, col_def) in &missing_obs {
@@ -181,6 +190,19 @@ fn fix_schema_compat(conn: &rusqlite::Connection) -> crate::Result<()> {
 
     if !sess_cols.iter().any(|c| c == "summary") {
         alter_cmds.push("ALTER TABLE sessions ADD COLUMN summary TEXT".into());
+    }
+
+    // Check edges table for recorded_at (bitemporal support)
+    let edge_cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(edges)")
+        .map_err(|e| EngramError::Database(e.to_string()))?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| EngramError::Database(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if !edge_cols.iter().any(|c| c == "recorded_at") {
+        alter_cmds.push("ALTER TABLE edges ADD COLUMN recorded_at TEXT NOT NULL DEFAULT ''".into());
     }
 
     // Apply ALTER TABLE commands

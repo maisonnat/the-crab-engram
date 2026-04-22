@@ -1,0 +1,20 @@
+// GBNF Grammar for structured knowledge graph extraction.
+// Forces the LLM to output valid JSON matching the extraction schema.
+// Used with llama.cpp's grammar-based sampling for guaranteed structured output.
+
+root ::= knowledge-capsule
+
+knowledge-capsule ::= "{" ws "\"title\"" ws ":" ws string ws "," ws "\"observations\"" ws ":" ws "[" ws (observation (ws "," ws observation)*)? ws "]" ws "," ws "\"edges\"" ws ":" ws "[" ws (edge (ws "," ws edge)*)? ws "]" ws "}"
+
+observation ::= "{" ws "\"type\"" ws ":" ws obs-type ws "," ws "\"title\"" ws ":" ws string ws "," ws "\"content\"" ws ":" ws string ws (ws "," ws "\"topic_key\"" ws ":" ws (string | "null"))? "}"
+
+edge ::= "{" ws "\"source_id\"" ws ":" ws integer ws "," ws "\"target_id\"" ws ":" ws integer ws "," ws "\"relation\"" ws ":" ws relation-type ws "," ws "\"weight\"" ws ":" ws float ws "}"
+
+obs-type ::= "\"bugfix\"" | "\"decision\"" | "\"architecture\"" | "\"pattern\"" | "\"discovery\"" | "\"learning\"" | "\"config\"" | "\"convention\"" | "\"tool_use\"" | "\"file_change\"" | "\"command\"" | "\"file_read\"" | "\"search\"" | "\"manual\""
+
+relation-type ::= "\"caused_by\"" | "\"related_to\"" | "\"supersedes\"" | "\"blocks\"" | "\"part_of\""
+
+string ::= "\"" ([^"\\] | "\\" .)* "\""
+integer ::= ("-"? [0-9]+)
+float ::= ("-"? [0-9]+ ("." [0-9]+)?)
+ws ::= [ \t\n\r]*
