@@ -53,6 +53,8 @@ pub struct Edge {
     pub weight: f64,
     pub valid_from: DateTime<Utc>,
     pub valid_until: Option<DateTime<Utc>>,
+    /// Transaction time: when this edge was recorded in the system (bitemporal).
+    pub recorded_at: DateTime<Utc>,
     pub superseded_by: Option<i64>,
     pub auto_detected: bool,
 }
@@ -67,6 +69,7 @@ impl Edge {
             weight,
             valid_from: Utc::now(),
             valid_until: None,
+            recorded_at: Utc::now(),
             superseded_by: None,
             auto_detected: false,
         }

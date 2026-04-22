@@ -31,6 +31,8 @@ impl Default for EmbeddingMeta {
 pub struct HydratedEmbedding {
     pub observation_embedding: Vec<f32>,
     pub attachment_embeddings: Vec<Vec<f32>>,
+    /// 1-bit binary hash of the observation embedding (384 bits → 48 bytes).
+    pub binary_hash: Vec<u8>,
     pub confidence: f64,
     pub updated_at: DateTime<Utc>,
 }
@@ -127,8 +129,9 @@ impl Embedder {
         let confidence = confidence_from_text_length(total_text_len);
 
         Ok(HydratedEmbedding {
-            observation_embedding,
+            observation_embedding: observation_embedding.clone(),
             attachment_embeddings,
+            binary_hash: binary_quantize(&observation_embedding),
             confidence,
             updated_at: Utc::now(),
         })
@@ -176,6 +179,54 @@ impl std::fmt::Debug for Embedder {
             .field("meta", &self.meta)
             .finish()
     }
+}
+
+/// Binary quantization: convert f32 embedding to 1-bit packed representation.
+/// Each dimension: (val > 0.0) ? 1 : 0, packed 8 bits per byte.
+/// For 384 dimensions → 48 bytes.
+///
+/// Reference: HuggingFace Research — Binary and Scalar Embedding Quantization
+pub fn binary_quantize(vec: &[f32]) -> Vec<u8> {
+    let byte_count = (vec.len() + 7) / 8;
+    let mut packed = vec![0u8; byte_count];
+
+    for (i, &val) in vec.iter().enumerate() {
+        if val > 0.0 {
+            packed[i / 8] |= 1 << (i % 8);
+        }
+    }
+
+    packed
+}
+
+/// Hamming distance between two binary-packed vectors.
+/// Returns the number of differing bits.
+pub fn hamming_distance(a: &[u8], b: &[u8]) -> u32 {
+    let min_len = a.len().min(b.len());
+    let mut dist = 0u32;
+
+    for i in 0..min_len {
+        // XOR to find differing bits, then count them
+        dist += (a[i] ^ b[i]).count_ones();
+    }
+
+    // Extra bytes in the longer vector count as all-different
+    let extra = a.len().abs_diff(b.len());
+    dist += (extra as u32) * 8;
+
+    dist
+}
+
+/// Hamming similarity (normalized): 1.0 = identical, 0.0 = completely different.
+pub fn hamming_similarity(a: &[u8], b: &[u8]) -> f64 {
+    if a.is_empty() && b.is_empty() {
+        return 1.0;
+    }
+    let total_bits = a.len().max(b.len()) as f64 * 8.0;
+    if total_bits == 0.0 {
+        return 1.0;
+    }
+    1.0 - (hamming_distance(a, b) as f64 / total_bits)
 }
 
 #[cfg(test)]
@@ -304,5 +355,74 @@ mod tests {
     #[test]
     fn confidence_from_text_length_max() {
         assert_eq!(confidence_from_text_length(1000), 0.95);
+    }
+
+    #[test]
+    fn binary_quantize_all_positive() {
+        let vec = vec![1.0, 2.0, 3.0, 0.5, 0.1, 5.0, 1.0, 1.0]; // 8 values, all > 0
+        let packed = binary_quantize(&vec);
+        assert_eq!(packed.len(), 1); // 8 bits → 1 byte
+        assert_eq!(packed[0], 0b11111111); // all 1s
+    }
+
+    #[test]
+    fn binary_quantize_mixed() {
+        // +, -, +, -, +, -, +, -
+        let vec = vec![1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
+        let packed = binary_quantize(&vec);
+        assert_eq!(packed.len(), 1);
+        assert_eq!(packed[0], 0b01010101); // bits 0,2,4,6 set
+    }
+
+    #[test]
+    fn binary_quantize_all_negative() {
+        let vec = vec![-1.0, -2.0, -3.0, -0.5, -0.1, -5.0, -1.0, -1.0];
+        let packed = binary_quantize(&vec);
+        assert_eq!(packed[0], 0b00000000); // all 0s
+    }
+
+    #[test]
+    fn binary_quantize_384d_produces_48_bytes() {
+        let vec = vec![0.5_f32; 384];
+        let packed = binary_quantize(&vec);
+        assert_eq!(packed.len(), 48); // 384 / 8 = 48
+    }
+
+    #[test]
+    fn hamming_distance_identical() {
+        let a = vec![0b11110000, 0b10101010];
+        let b = vec![0b11110000, 0b10101010];
+        assert_eq!(hamming_distance(&a, &b), 0);
+    }
+
+    #[test]
+    fn hamming_distance_different() {
+        let a = vec![0b11111111]; // 8 ones
+        let b = vec![0b00000000]; // 8 zeros
+        assert_eq!(hamming_distance(&a, &b), 8);
+    }
+
+    #[test]
+    fn hamming_distance_partial() {
+        let a = vec![0b11001100];
+        let b = vec![0b10101010];
+        // XOR = 01100110 → 4 bits differ
+        assert_eq!(hamming_distance(&a, &b), 4);
+    }
+
+    #[test]
+    fn hamming_similarity_identical() {
+        let a = vec![0xFF, 0xAA];
+        let b = vec![0xFF, 0xAA];
+        let sim = hamming_similarity(&a, &b);
+        assert!((sim - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hamming_similarity_opposite() {
+        let a = vec![0xFF];
+        let b = vec![0x00];
+        let sim = hamming_similarity(&a, &b);
+        assert!(sim.abs() < 1e-6);
     }
 }

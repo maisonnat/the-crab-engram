@@ -175,6 +175,10 @@ impl SqliteStore {
                 .get::<_, String>("updated_at")?
                 .parse()
                 .unwrap_or_default(),
+            recorded_at: row
+                .get::<_, String>("recorded_at")?
+                .parse()
+                .unwrap_or_default(),
             access_count: row.get("access_count")?,
             last_accessed: row
                 .get::<_, Option<String>>("last_accessed")?
@@ -226,6 +230,10 @@ impl SqliteStore {
             valid_until: row
                 .get::<_, Option<String>>("valid_until")?
                 .and_then(|s| s.parse().ok()),
+            recorded_at: row
+                .get::<_, String>("recorded_at")?
+                .parse()
+                .unwrap_or_default(),
             superseded_by: row.get("superseded_by")?,
             auto_detected: auto_detected != 0,
         })
@@ -295,9 +303,9 @@ impl Storage for SqliteStore {
         conn.execute(
             "INSERT INTO observations \
              (type, scope, title, content, session_id, project, topic_key, \
-              created_at, updated_at, normalized_hash, provenance_source, \
+              created_at, updated_at, recorded_at, normalized_hash, provenance_source, \
               provenance_confidence, provenance_evidence, lifecycle_state) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?8, ?9, ?10, \
                      (SELECT CASE ?10 \
                       WHEN 'test_verified' THEN 0.95 \
                       WHEN 'code_analysis' THEN 0.85 \
@@ -512,8 +520,9 @@ impl Storage for SqliteStore {
         );
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
-        // Escape FTS5 special chars
-        let escaped_query = opts.query.replace('"', "\"\"");
+        // Escape FTS5 special chars — wrap in quotes so FTS5 treats it as a phrase
+        // and does not interpret -, OR, NOT as operators
+        let escaped_query = format!("\"{}\"", opts.query.replace('"', "\"\""));
         params_vec.push(Box::new(escaped_query));
 
         if let Some(project) = &opts.project {
@@ -853,34 +862,55 @@ impl Storage for SqliteStore {
         let now = Utc::now().to_rfc3339();
 
         // Auto-close existing active edge between same nodes with same relation
-        conn.execute(
-            "UPDATE edges SET valid_until = ? \
-             WHERE source_id = ? AND target_id = ? AND relation = ? AND valid_until IS NULL",
-            rusqlite::params![
-                now,
-                params.source_id,
-                params.target_id,
-                params.relation.to_string()
-            ],
-        )
-        .map_err(|e| EngramError::Database(e.to_string()))?;
+        // Also mark the old edge as superseded (bitemporal supersedes logic)
+        let superseded_rows: Vec<i64> = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id FROM edges \
+                     WHERE source_id = ? AND target_id = ? AND relation = ? AND valid_until IS NULL",
+                )
+                .map_err(|e| EngramError::Database(e.to_string()))?;
+            let rows = stmt
+                .query_map(
+                    rusqlite::params![
+                        params.source_id,
+                        params.target_id,
+                        params.relation.to_string()
+                    ],
+                    |row| row.get(0),
+                )
+                .map_err(|e| EngramError::Database(e.to_string()))?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
 
         conn.execute(
             "INSERT INTO edges \
-             (source_id, target_id, relation, weight, valid_from, auto_detected) \
-             VALUES (?, ?, ?, ?, ?, ?)",
+             (source_id, target_id, relation, weight, valid_from, recorded_at, auto_detected) \
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 params.source_id,
                 params.target_id,
                 params.relation.to_string(),
                 params.weight,
                 now,
+                now,
                 if params.auto_detected { 1 } else { 0 },
             ],
         )
         .map_err(|e| EngramError::Database(e.to_string()))?;
 
-        Ok(conn.last_insert_rowid())
+        let new_id = conn.last_insert_rowid();
+
+        // Close and mark old edges as superseded by the new one
+        for old_id in superseded_rows {
+            conn.execute(
+                "UPDATE edges SET valid_until = ?, superseded_by = ? WHERE id = ?",
+                rusqlite::params![now, new_id, old_id],
+            )
+            .map_err(|e| EngramError::Database(e.to_string()))?;
+        }
+
+        Ok(new_id)
     }
 
     fn get_edges(&self, observation_id: i64) -> Result<Vec<Edge>> {

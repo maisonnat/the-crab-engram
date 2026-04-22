@@ -99,6 +99,8 @@ pub struct Observation {
     pub topic_key: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Transaction time: when this observation was recorded in the system (bitemporal).
+    pub recorded_at: DateTime<Utc>,
     pub access_count: i64,
     pub last_accessed: Option<DateTime<Utc>>,
     pub pinned: bool,
@@ -213,6 +215,7 @@ impl Observation {
             topic_key,
             created_at: now,
             updated_at: now,
+            recorded_at: now,
             access_count: 0,
             last_accessed: None,
             pinned: false,

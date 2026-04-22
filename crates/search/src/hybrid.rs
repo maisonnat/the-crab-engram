@@ -47,6 +47,54 @@ pub fn compute_relevance_score(
         + 0.2 * frequency_score
 }
 
+/// Three-way RRF combining FTS5 + binary prefilter + full vector results.
+///
+/// Binary pre-filter shortlists candidates via Hamming distance,
+/// then full cosine similarity re-ranks the shortlist.
+/// This is much faster than scanning all full vectors.
+pub fn reciprocal_rank_fusion_binary(
+    fts_results: &[(i64, f64)],       // (observation_id, fts_rank)
+    binary_results: &[(i64, f64)],    // (observation_id, hamming_similarity 0-1)
+    vector_results: &[(i64, f64)],    // (observation_id, cosine_similarity)
+    k: usize,
+    fts_weight: f64,
+    binary_weight: f64,
+    vector_weight: f64,
+) -> Vec<(i64, f64)> {
+    use std::collections::HashMap;
+
+    let mut scores: HashMap<i64, f64> = HashMap::new();
+
+    // FTS contribution
+    for (rank, (id, _score)) in fts_results.iter().enumerate() {
+        let rrf_score = fts_weight / (k as f64 + rank as f64 + 1.0);
+        *scores.entry(*id).or_insert(0.0) += rrf_score;
+    }
+
+    // Binary prefilter contribution (hamming similarity → rank)
+    let mut sorted_binary = binary_results.to_vec();
+    sorted_binary.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (rank, (id, _sim)) in sorted_binary.iter().enumerate() {
+        let rrf_score = binary_weight / (k as f64 + rank as f64 + 1.0);
+        *scores.entry(*id).or_insert(0.0) += rrf_score;
+    }
+
+    // Full vector contribution (cosine similarity → rank)
+    let mut sorted_vector = vector_results.to_vec();
+    sorted_vector.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (rank, (id, _sim)) in sorted_vector.iter().enumerate() {
+        let rrf_score = vector_weight / (k as f64 + rank as f64 + 1.0);
+        *scores.entry(*id).or_insert(0.0) += rrf_score;
+    }
+
+    // Sort by combined score descending
+    let mut result: Vec<(i64, f64)> = scores.into_iter().collect();
+    result.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
