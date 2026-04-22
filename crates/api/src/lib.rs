@@ -49,6 +49,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/graph/:id", get(graph_edges))
         .route("/inject", post(inject))
         .route("/antipatterns", get(antipatterns))
+        // Hermes memory provider endpoints
+        .route("/sync", post(sync_turn))
+        .route("/remember", post(remember))
+        .route("/recall", post(recall))
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
@@ -466,5 +470,167 @@ mod tests {
         };
         let json = serde_json::to_string(&err).unwrap();
         assert!(json.contains("test error"));
+    }
+}
+
+// ── Hermes Memory Provider Routes ─────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct SyncTurnRequest {
+    pub user: String,
+    pub assistant: String,
+    pub session_id: Option<String>,
+}
+
+/// POST /sync — Persist a completed conversation turn.
+/// Used by Hermes memory provider to sync each turn into the knowledge graph.
+async fn sync_turn(
+    State(state): State<AppState>,
+    Json(req): Json<SyncTurnRequest>,
+) -> impl IntoResponse {
+    let session_id = req
+        .session_id
+        .unwrap_or_else(|| state.store.create_session(&state.project).unwrap_or("default".into()));
+
+    // Store the user turn
+    let user_params = AddObservationParams {
+        r#type: ObservationType::Manual,
+        scope: Scope::Project,
+        title: format!("User: {}", truncate(&req.user, 80)),
+        content: req.user,
+        session_id: session_id.clone(),
+        project: state.project.clone(),
+        ..Default::default()
+    };
+
+    // Store the assistant turn
+    let asst_params = AddObservationParams {
+        r#type: ObservationType::Manual,
+        scope: Scope::Project,
+        title: format!("Assistant: {}", truncate(&req.assistant, 80)),
+        content: req.assistant,
+        session_id,
+        project: state.project.clone(),
+        ..Default::default()
+    };
+
+    let user_id = state.store.insert_observation(&user_params);
+    let asst_id = state.store.insert_observation(&asst_params);
+
+    match (user_id, asst_id) {
+        (Ok(uid), Ok(aid)) => Json(serde_json::json!({
+            "status": "synced",
+            "user_observation_id": uid,
+            "assistant_observation_id": aid,
+        }))
+        .into_response(),
+        (Err(e), _) | (_, Err(e)) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RememberRequest {
+    pub content: String,
+    pub memory_type: Option<String>,
+    pub importance: Option<f64>,
+    pub topic_key: Option<String>,
+}
+
+/// POST /remember — Persist an explicit fact, preference, or decision.
+/// Simplified endpoint for Hermes to save knowledge explicitly.
+async fn remember(
+    State(state): State<AppState>,
+    Json(req): Json<RememberRequest>,
+) -> impl IntoResponse {
+    let obs_type = match req.memory_type.as_deref() {
+        Some("preference") => ObservationType::Decision,
+        Some("decision") => ObservationType::Decision,
+        Some("procedure") => ObservationType::Learning,
+        Some("discovery") => ObservationType::Discovery,
+        _ => ObservationType::Manual,
+    };
+
+    let session_id = state
+        .store
+        .create_session(&state.project)
+        .unwrap_or("memory".into());
+
+    let params = AddObservationParams {
+        r#type: obs_type,
+        scope: Scope::Project,
+        title: truncate(&req.content, 80),
+        content: req.content,
+        session_id,
+        project: state.project.clone(),
+        topic_key: req.topic_key,
+        ..Default::default()
+    };
+
+    match state.store.insert_observation(&params) {
+        Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RecallRequest {
+    pub query: String,
+    pub limit: Option<usize>,
+}
+
+/// POST /recall — Semantic search returning formatted context for Hermes.
+/// Returns top-k results as a markdown block ready for injection.
+async fn recall(
+    State(state): State<AppState>,
+    Json(req): Json<RecallRequest>,
+) -> impl IntoResponse {
+    let limit = req.limit.unwrap_or(8);
+    let opts = SearchOptions {
+        query: req.query,
+        project: Some(state.project.clone()),
+        limit: Some(limit),
+        ..Default::default()
+    };
+
+    match state.store.search(&opts) {
+        Ok(results) => {
+            let mut lines = vec!["## Recalled Context".to_string()];
+            for (i, obs) in results.iter().enumerate() {
+                lines.push(format!(
+                    "{}. **{}** [{}]\n   {}",
+                    i + 1,
+                    obs.title,
+                    obs.r#type,
+                    truncate(&obs.content, 200)
+                ));
+            }
+            if results.is_empty() {
+                lines.push("_No relevant memories found._".to_string());
+            }
+            Json(serde_json::json!({
+                "count": results.len(),
+                "context": lines.join("\n\n"),
+            }))
+            .into_response()
+        }
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+/// Truncate a string to max_len characters, appending "..." if truncated.
+fn truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len.saturating_sub(3)])
     }
 }
