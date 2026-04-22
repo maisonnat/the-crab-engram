@@ -8,7 +8,7 @@
 //! Includes semantic validation: weight ranges, relation type consistency,
 //! and observation type validity.
 
-use engram_core::{graph::RelationType, ObservationType};
+use engram_core::{ObservationType, graph::RelationType};
 use serde::{Deserialize, Serialize};
 
 use crate::inference::InferenceEngine;
@@ -49,10 +49,23 @@ pub struct KnowledgeExtraction {
 /// Validation error for extracted data.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValidationError {
-    WeightOutOfRange { index: usize, value: f64 },
-    InvalidRelationType { index: usize, relation: String },
-    InvalidObservationType { index: usize, obs_type: String },
-    InconsistentNodeIds { source: i64, target: i64, max_obs: usize },
+    WeightOutOfRange {
+        index: usize,
+        value: f64,
+    },
+    InvalidRelationType {
+        index: usize,
+        relation: String,
+    },
+    InvalidObservationType {
+        index: usize,
+        obs_type: String,
+    },
+    InconsistentNodeIds {
+        source: i64,
+        target: i64,
+        max_obs: usize,
+    },
 }
 
 /// Result of the extraction pipeline.
@@ -307,7 +320,11 @@ mod tests {
             }],
         };
         let errors = validate_extraction(&extraction);
-        assert!(errors.iter().any(|e| matches!(e, ValidationError::WeightOutOfRange { .. })));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::WeightOutOfRange { .. }))
+        );
     }
 
     #[test]
@@ -323,7 +340,11 @@ mod tests {
             }],
         };
         let errors = validate_extraction(&extraction);
-        assert!(errors.iter().any(|e| matches!(e, ValidationError::InvalidRelationType { .. })));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::InvalidRelationType { .. }))
+        );
     }
 
     #[test]
@@ -339,7 +360,11 @@ mod tests {
             edges: vec![],
         };
         let errors = validate_extraction(&extraction);
-        assert!(errors.iter().any(|e| matches!(e, ValidationError::InvalidObservationType { .. })));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::InvalidObservationType { .. }))
+        );
     }
 
     #[test]
@@ -360,7 +385,11 @@ mod tests {
             }],
         };
         let errors = validate_extraction(&extraction);
-        assert!(errors.iter().any(|e| matches!(e, ValidationError::InconsistentNodeIds { .. })));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::InconsistentNodeIds { .. }))
+        );
     }
 
     #[test]

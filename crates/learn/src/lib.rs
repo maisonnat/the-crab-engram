@@ -27,6 +27,6 @@ pub use stream_engine::MemoryStream;
 pub use inference::{CacheKey, InferenceEngine};
 
 pub use extraction::{
-    ExtractionError, ExtractionPipeline, ExtractionResult, ExtractedEdge, ExtractedObservation,
+    ExtractedEdge, ExtractedObservation, ExtractionError, ExtractionPipeline, ExtractionResult,
     KnowledgeExtraction, ValidationError,
 };

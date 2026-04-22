@@ -488,9 +488,12 @@ async fn sync_turn(
     State(state): State<AppState>,
     Json(req): Json<SyncTurnRequest>,
 ) -> impl IntoResponse {
-    let session_id = req
-        .session_id
-        .unwrap_or_else(|| state.store.create_session(&state.project).unwrap_or("default".into()));
+    let session_id = req.session_id.unwrap_or_else(|| {
+        state
+            .store
+            .create_session(&state.project)
+            .unwrap_or("default".into())
+    });
 
     // Store the user turn
     let user_params = AddObservationParams {

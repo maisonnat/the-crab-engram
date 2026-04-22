@@ -226,18 +226,9 @@ mod tests {
 
     #[test]
     fn column_conflict_resolution() {
-        assert_eq!(
-            resolve_column_conflict(3, 5),
-            ConflictResolution::UseRemote
-        );
-        assert_eq!(
-            resolve_column_conflict(5, 3),
-            ConflictResolution::UseLocal
-        );
-        assert_eq!(
-            resolve_column_conflict(5, 5),
-            ConflictResolution::UseLocal
-        );
+        assert_eq!(resolve_column_conflict(3, 5), ConflictResolution::UseRemote);
+        assert_eq!(resolve_column_conflict(5, 3), ConflictResolution::UseLocal);
+        assert_eq!(resolve_column_conflict(5, 5), ConflictResolution::UseLocal);
     }
 
     #[test]

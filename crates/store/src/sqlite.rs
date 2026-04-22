@@ -862,7 +862,9 @@ impl Storage for SqliteStore {
         let now = Utc::now().to_rfc3339();
 
         // Wrap all operations in a transaction for atomicity
-        let tx = conn.unchecked_transaction().map_err(|e| EngramError::Database(e.to_string()))?;
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| EngramError::Database(e.to_string()))?;
 
         // Auto-close existing active edge between same nodes with same relation
         // Also mark the old edge as superseded (bitemporal supersedes logic)
@@ -914,7 +916,8 @@ impl Storage for SqliteStore {
             .map_err(|e| EngramError::Database(e.to_string()))?;
         }
 
-        tx.commit().map_err(|e| EngramError::Database(e.to_string()))?;
+        tx.commit()
+            .map_err(|e| EngramError::Database(e.to_string()))?;
         Ok(new_id)
     }
 

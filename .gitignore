@@ -35,3 +35,8 @@ engram-chunks/
 *.so
 *.dylib
 .aider*
+
+# AI tool configs (local-only, not for repo)
+.opencode/
+.specify/
+AGENTS.md

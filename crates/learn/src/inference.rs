@@ -85,7 +85,10 @@ impl InferenceEngine {
     /// Called automatically by `infer()` if not yet loaded.
     #[cfg(feature = "inference")]
     pub fn load(&self) -> Result<()> {
-        let mut guard = self.model.lock().map_err(|e| anyhow::anyhow!("lock: {e}"))?;
+        let mut guard = self
+            .model
+            .lock()
+            .map_err(|e| anyhow::anyhow!("lock: {e}"))?;
         if guard.is_some() {
             return Ok(());
         }
@@ -99,7 +102,10 @@ impl InferenceEngine {
 
     #[cfg(not(feature = "inference"))]
     pub fn load(&self) -> Result<()> {
-        let mut guard = self.model.lock().map_err(|e| anyhow::anyhow!("lock: {e}"))?;
+        let mut guard = self
+            .model
+            .lock()
+            .map_err(|e| anyhow::anyhow!("lock: {e}"))?;
         if guard.is_some() {
             return Ok(());
         }
@@ -130,7 +136,10 @@ impl InferenceEngine {
         // let guard = self.model.lock().unwrap();
         // let loaded = guard.as_ref().ok_or_else(|| anyhow::anyhow!("model not loaded"))?;
         // loaded._context.generate(prompt, ...)
-        Ok(format!("[stub inference for: {}]", &prompt[..prompt.len().min(50)]))
+        Ok(format!(
+            "[stub inference for: {}]",
+            &prompt[..prompt.len().min(50)]
+        ))
     }
 
     #[cfg(not(feature = "inference"))]
@@ -139,7 +148,10 @@ impl InferenceEngine {
             self.load()?;
         }
         // Stub mode: return a placeholder
-        Ok(format!("[stub inference for: {}]", &prompt[..prompt.len().min(50)]))
+        Ok(format!(
+            "[stub inference for: {}]",
+            &prompt[..prompt.len().min(50)]
+        ))
     }
 
     /// Cache a system prompt + schema prefix for reuse across inferences.

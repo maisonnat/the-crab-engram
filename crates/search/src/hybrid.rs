@@ -53,9 +53,9 @@ pub fn compute_relevance_score(
 /// then full cosine similarity re-ranks the shortlist.
 /// This is much faster than scanning all full vectors.
 pub fn reciprocal_rank_fusion_binary(
-    fts_results: &[(i64, f64)],       // (observation_id, fts_rank)
-    binary_results: &[(i64, f64)],    // (observation_id, hamming_similarity 0-1)
-    vector_results: &[(i64, f64)],    // (observation_id, cosine_similarity)
+    fts_results: &[(i64, f64)],    // (observation_id, fts_rank)
+    binary_results: &[(i64, f64)], // (observation_id, hamming_similarity 0-1)
+    vector_results: &[(i64, f64)], // (observation_id, cosine_similarity)
     k: usize,
     fts_weight: f64,
     binary_weight: f64,
