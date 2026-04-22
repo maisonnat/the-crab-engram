@@ -127,11 +127,12 @@ impl Embedder {
         let total_text_len: usize =
             observation_text.len() + attachment_embeddable.iter().map(|t| t.len()).sum::<usize>();
         let confidence = confidence_from_text_length(total_text_len);
+        let binary_hash = binary_quantize(&observation_embedding);
 
         Ok(HydratedEmbedding {
-            observation_embedding: observation_embedding.clone(),
+            observation_embedding,
             attachment_embeddings,
-            binary_hash: binary_quantize(&observation_embedding),
+            binary_hash,
             confidence,
             updated_at: Utc::now(),
         })

@@ -25,6 +25,13 @@ impl std::fmt::Display for RelationType {
     }
 }
 
+impl RelationType {
+    /// Return all valid relation type strings (derived from enum, single source of truth).
+    pub fn all_str() -> &'static [&'static str] {
+        &["caused_by", "related_to", "supersedes", "blocks", "part_of"]
+    }
+}
+
 impl std::str::FromStr for RelationType {
     type Err = crate::EngramError;
 

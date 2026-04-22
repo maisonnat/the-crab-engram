@@ -861,10 +861,13 @@ impl Storage for SqliteStore {
         let conn = self.conn();
         let now = Utc::now().to_rfc3339();
 
+        // Wrap all operations in a transaction for atomicity
+        let tx = conn.unchecked_transaction().map_err(|e| EngramError::Database(e.to_string()))?;
+
         // Auto-close existing active edge between same nodes with same relation
         // Also mark the old edge as superseded (bitemporal supersedes logic)
         let superseded_rows: Vec<i64> = {
-            let mut stmt = conn
+            let mut stmt = tx
                 .prepare(
                     "SELECT id FROM edges \
                      WHERE source_id = ? AND target_id = ? AND relation = ? AND valid_until IS NULL",
@@ -880,10 +883,11 @@ impl Storage for SqliteStore {
                     |row| row.get(0),
                 )
                 .map_err(|e| EngramError::Database(e.to_string()))?;
-            rows.filter_map(|r| r.ok()).collect()
+            rows.collect::<rusqlite::Result<Vec<i64>>>()
+                .map_err(|e| EngramError::Database(e.to_string()))?
         };
 
-        conn.execute(
+        tx.execute(
             "INSERT INTO edges \
              (source_id, target_id, relation, weight, valid_from, recorded_at, auto_detected) \
              VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -899,17 +903,18 @@ impl Storage for SqliteStore {
         )
         .map_err(|e| EngramError::Database(e.to_string()))?;
 
-        let new_id = conn.last_insert_rowid();
+        let new_id = tx.last_insert_rowid();
 
         // Close and mark old edges as superseded by the new one
         for old_id in superseded_rows {
-            conn.execute(
+            tx.execute(
                 "UPDATE edges SET valid_until = ?, superseded_by = ? WHERE id = ?",
                 rusqlite::params![now, new_id, old_id],
             )
             .map_err(|e| EngramError::Database(e.to_string()))?;
         }
 
+        tx.commit().map_err(|e| EngramError::Database(e.to_string()))?;
         Ok(new_id)
     }
 

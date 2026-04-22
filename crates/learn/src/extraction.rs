@@ -8,6 +8,7 @@
 //! Includes semantic validation: weight ranges, relation type consistency,
 //! and observation type validity.
 
+use engram_core::{graph::RelationType, ObservationType};
 use serde::{Deserialize, Serialize};
 
 use crate::inference::InferenceEngine;
@@ -131,29 +132,8 @@ pub enum ExtractionError {
 fn validate_extraction(extraction: &KnowledgeExtraction) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
-    let valid_relations = [
-        "caused_by",
-        "related_to",
-        "supersedes",
-        "blocks",
-        "part_of",
-    ];
-    let valid_types = [
-        "bugfix",
-        "decision",
-        "architecture",
-        "pattern",
-        "discovery",
-        "learning",
-        "config",
-        "convention",
-        "tool_use",
-        "file_change",
-        "command",
-        "file_read",
-        "search",
-        "manual",
-    ];
+    let valid_relations = RelationType::all_str();
+    let valid_types = ObservationType::all_str();
 
     // Validate observation types
     for (i, obs) in extraction.observations.iter().enumerate() {
@@ -206,11 +186,13 @@ fn validate_extraction(extraction: &KnowledgeExtraction) -> Vec<ValidationError>
 
 /// Build the initial extraction prompt.
 fn build_extraction_prompt(input: &str) -> String {
+    let obs_types = ObservationType::all_str().join(", ");
+    let rel_types = RelationType::all_str().join(", ");
     format!(
         "Extract structured knowledge from the following text as JSON.\n\
          Follow the schema: {{\"title\": string, \"observations\": [{{\"type\": string, \"title\": string, \"content\": string, \"topic_key\": string|null}}], \"edges\": [{{\"source_id\": int, \"target_id\": int, \"relation\": string, \"weight\": float}}]}}\n\
-         Valid observation types: bugfix, decision, architecture, pattern, discovery, learning, config, convention, tool_use, file_change, command, file_read, search, manual\n\
-         Valid relation types: caused_by, related_to, supersedes, blocks, part_of\n\
+         Valid observation types: {obs_types}\n\
+         Valid relation types: {rel_types}\n\
          Weight must be between 0.0 and 1.0.\n\n\
          Text:\n{input}\n\n\
          Output only valid JSON:"

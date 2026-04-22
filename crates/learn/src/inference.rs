@@ -152,9 +152,10 @@ impl InferenceEngine {
         key_str.hash(&mut hasher);
         let hash = format!("{:016x}", hasher.finish());
 
-        // In stub mode, store an empty vec. With inference, store tokenized prefix.
+        // In stub mode, store the raw concatenated prompt for reuse.
+        // With inference enabled, this stores the tokenized prefix instead.
         if let Ok(mut cache) = self.cache.lock() {
-            cache.insert(&hash, Vec::new());
+            cache.insert(&hash, key_str.as_bytes().to_vec());
         }
 
         CacheKey { hash }

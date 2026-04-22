@@ -8,10 +8,6 @@ pub mod smart_injector;
 pub mod spaced_review;
 pub mod stream_engine;
 
-#[cfg(feature = "inference")]
-pub mod inference;
-#[cfg(not(feature = "inference"))]
-#[path = "inference.rs"]
 pub mod inference;
 
 pub mod extraction;

@@ -45,6 +45,17 @@ impl std::fmt::Display for ObservationType {
     }
 }
 
+impl ObservationType {
+    /// Return all valid observation type strings (derived from enum, single source of truth).
+    pub fn all_str() -> &'static [&'static str] {
+        &[
+            "bugfix", "decision", "architecture", "pattern", "discovery",
+            "learning", "config", "convention", "tool_use", "file_change",
+            "command", "file_read", "search", "manual",
+        ]
+    }
+}
+
 impl std::str::FromStr for ObservationType {
     type Err = crate::EngramError;
 
