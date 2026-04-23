@@ -11,6 +11,7 @@ use self_update::backends::github::{ReleaseList, Update};
 use sha2::{Digest, Sha256};
 
 use crate::learn_daemon::{LearnDaemon, LearnDaemonConfig, format_tick_summary};
+use engram_api::LearnTickStatus;
 
 mod learn_daemon;
 mod opencode_setup;
@@ -668,10 +669,44 @@ async fn main() -> Result<()> {
                 });
             }
 
+            let learn_tick_fn = if learn_daemon {
+                let tick_store: Arc<dyn Storage> = store.clone();
+                let tick_config = LearnDaemonConfig {
+                    project: cli.project.clone(),
+                    interval_seconds: learn_interval,
+                    ..Default::default()
+                };
+                let tick_status = learn_status.clone();
+                Some(Arc::new(move || {
+                    let daemon = LearnDaemon::new(
+                        tick_store.clone(),
+                        tick_config.clone(),
+                        None,
+                        Some(tick_status.clone()),
+                    );
+                    daemon
+                        .run_once()
+                        .map(|r| LearnTickStatus {
+                            entities_linked: r.entities_linked,
+                            capsules_upserted: r.capsules_upserted,
+                            reviews_upserted: r.reviews_upserted,
+                            anti_patterns_found: r.anti_patterns_found,
+                            snapshots_written: r.snapshots_written,
+                        })
+                        .map_err(|e| e.to_string())
+                })
+                    as Arc<
+                        dyn Fn() -> Result<LearnTickStatus, String> + Send + Sync,
+                    >)
+            } else {
+                None
+            };
+
             let state = engram_api::AppState {
                 store,
                 project: cli.project.clone(),
                 learn_status: Some(learn_status),
+                learn_tick_fn,
             };
             let app = engram_api::create_router(state);
             let addr = format!("0.0.0.0:{port}");

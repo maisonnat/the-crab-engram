@@ -69,6 +69,7 @@ pub struct AppState {
     pub store: Arc<dyn Storage>,
     pub project: String,
     pub learn_status: Option<Arc<Mutex<LearnDaemonStatus>>>,
+    pub learn_tick_fn: Option<Arc<dyn Fn() -> Result<LearnTickStatus, String> + Send + Sync>>,
 }
 
 /// Create the API router.
@@ -76,6 +77,7 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/learn/status", get(learn_status))
+        .route("/learn/run", post(learn_run))
         .route(
             "/observations",
             get(search_observations).post(create_observation),
@@ -172,6 +174,26 @@ async fn learn_status(State(state): State<AppState>) -> impl IntoResponse {
     };
 
     Json(status)
+}
+
+/// POST /learn/run — Trigger a manual learn tick.
+async fn learn_run(State(state): State<AppState>) -> impl IntoResponse {
+    let Some(tick_fn) = &state.learn_tick_fn else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "learn daemon not enabled"})),
+        )
+            .into_response();
+    };
+
+    match tick_fn() {
+        Ok(tick) => (StatusCode::OK, Json(tick)).into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+    }
 }
 
 #[derive(Deserialize)]

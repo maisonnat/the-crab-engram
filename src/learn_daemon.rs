@@ -259,7 +259,7 @@ impl LearnDaemon {
                     "{}\n\nSeverity: {}\nSuggestion: {}\nEvidence: {:?}",
                     pattern.description, pattern.severity, pattern.suggestion, pattern.evidence
                 );
-                self.store.insert_observation(&AddObservationParams {
+                match self.store.insert_observation(&AddObservationParams {
                     r#type: ObservationType::Learning,
                     scope: Scope::Project,
                     title: format!("Anti-pattern detected: {}", pattern.r#type),
@@ -273,7 +273,13 @@ impl LearnDaemon {
                         .iter()
                         .map(|id| format!("observation:{id}"))
                         .collect(),
-                })?;
+                }) {
+                    Ok(_) => {}
+                    Err(EngramError::Duplicate(_)) => {
+                        // Anti-pattern already recorded recently, skip
+                    }
+                    Err(e) => return Err(e),
+                }
             }
         }
 
@@ -293,7 +299,7 @@ impl LearnDaemon {
         }
 
         let session_id = self.ensure_session()?;
-        self.store.insert_observation(&AddObservationParams {
+        match self.store.insert_observation(&AddObservationParams {
             r#type: ObservationType::Learning,
             scope: Scope::Project,
             title: "Injection snapshot".into(),
@@ -303,9 +309,14 @@ impl LearnDaemon {
             topic_key: Some("learn/injection-snapshot".into()),
             provenance_source: Some("inferred".into()),
             provenance_evidence: vec![format!("generated_at:{}", Utc::now().to_rfc3339())],
-        })?;
-
-        Ok(1)
+        }) {
+            Ok(_) => Ok(1),
+            Err(EngramError::Duplicate(_)) => {
+                // Snapshot already recorded recently, skip
+                Ok(0)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     fn project_observations(
