@@ -646,6 +646,11 @@ async fn main() -> Result<()> {
             learn_interval,
         } => {
             let store = Arc::new(open_store(cli.db)?);
+            let learn_status = Arc::new(std::sync::Mutex::new(if learn_daemon {
+                engram_api::LearnDaemonStatus::enabled(cli.project.clone(), learn_interval)
+            } else {
+                engram_api::LearnDaemonStatus::disabled(cli.project.clone())
+            }));
 
             if learn_daemon {
                 let daemon_store: Arc<dyn Storage> = store.clone();
@@ -654,8 +659,9 @@ async fn main() -> Result<()> {
                     interval_seconds: learn_interval,
                     ..Default::default()
                 };
+                let daemon_status = learn_status.clone();
                 std::thread::spawn(move || {
-                    let daemon = LearnDaemon::new(daemon_store, config, None);
+                    let daemon = LearnDaemon::new(daemon_store, config, None, Some(daemon_status));
                     if let Err(err) = daemon.run_loop() {
                         tracing::error!(?err, "learn daemon stopped");
                     }
@@ -665,6 +671,7 @@ async fn main() -> Result<()> {
             let state = engram_api::AppState {
                 store,
                 project: cli.project.clone(),
+                learn_status: Some(learn_status),
             };
             let app = engram_api::create_router(state);
             let addr = format!("0.0.0.0:{port}");
@@ -697,6 +704,7 @@ async fn main() -> Result<()> {
                     interval_seconds: interval,
                     ..Default::default()
                 },
+                None,
                 None,
             );
 

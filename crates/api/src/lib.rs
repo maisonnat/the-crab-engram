@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::{
     Json, Router,
@@ -14,17 +14,68 @@ use engram_core::{ObservationType, Scope};
 use engram_learn::{AntiPatternDetector, ConsolidationEngine, SmartInjector};
 use engram_store::{AddObservationParams, SearchOptions, Storage, UpdateObservationParams};
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LearnTickStatus {
+    pub entities_linked: usize,
+    pub capsules_upserted: usize,
+    pub reviews_upserted: usize,
+    pub anti_patterns_found: usize,
+    pub snapshots_written: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearnDaemonStatus {
+    pub enabled: bool,
+    pub project: String,
+    pub interval_seconds: u64,
+    pub ticks_run: u64,
+    pub last_started_at: Option<String>,
+    pub last_completed_at: Option<String>,
+    pub last_error: Option<String>,
+    pub last_tick: Option<LearnTickStatus>,
+}
+
+impl LearnDaemonStatus {
+    pub fn disabled(project: String) -> Self {
+        Self {
+            enabled: false,
+            project,
+            interval_seconds: 0,
+            ticks_run: 0,
+            last_started_at: None,
+            last_completed_at: None,
+            last_error: None,
+            last_tick: None,
+        }
+    }
+
+    pub fn enabled(project: String, interval_seconds: u64) -> Self {
+        Self {
+            enabled: true,
+            project,
+            interval_seconds,
+            ticks_run: 0,
+            last_started_at: None,
+            last_completed_at: None,
+            last_error: None,
+            last_tick: None,
+        }
+    }
+}
+
 /// Shared application state.
 #[derive(Clone)]
 pub struct AppState {
     pub store: Arc<dyn Storage>,
     pub project: String,
+    pub learn_status: Option<Arc<Mutex<LearnDaemonStatus>>>,
 }
 
 /// Create the API router.
 pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/learn/status", get(learn_status))
         .route(
             "/observations",
             get(search_observations).post(create_observation),
@@ -109,6 +160,18 @@ async fn health() -> impl IntoResponse {
         "status": "ok",
         "version": env!("CARGO_PKG_VERSION")
     }))
+}
+
+async fn learn_status(State(state): State<AppState>) -> impl IntoResponse {
+    let status = match &state.learn_status {
+        Some(status) => status
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or_else(|_| LearnDaemonStatus::disabled(state.project.clone())),
+        None => LearnDaemonStatus::disabled(state.project.clone()),
+    };
+
+    Json(status)
 }
 
 #[derive(Deserialize)]
@@ -470,6 +533,14 @@ mod tests {
         };
         let json = serde_json::to_string(&err).unwrap();
         assert!(json.contains("test error"));
+    }
+
+    #[test]
+    fn learn_daemon_status_is_serializable() {
+        let status = LearnDaemonStatus::enabled("default".into(), 60);
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("default"));
+        assert!(json.contains("interval_seconds"));
     }
 }
 

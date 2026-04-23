@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use chrono::Utc;
 use tracing::{error, info, warn};
 
+use engram_api::{LearnDaemonStatus, LearnTickStatus};
 use engram_core::{EngramError, ObservationType, Scope};
 use engram_learn::{
     AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, ConsolidationResult, EvolutionResult,
@@ -66,6 +67,7 @@ pub struct LearnDaemon {
     store: Arc<dyn Storage>,
     config: LearnDaemonConfig,
     embedder: Option<Arc<Embedder>>,
+    status: Option<Arc<Mutex<LearnDaemonStatus>>>,
 }
 
 impl LearnDaemon {
@@ -73,47 +75,60 @@ impl LearnDaemon {
         store: Arc<dyn Storage>,
         config: LearnDaemonConfig,
         embedder: Option<Arc<Embedder>>,
+        status: Option<Arc<Mutex<LearnDaemonStatus>>>,
     ) -> Self {
         Self {
             store,
             config,
             embedder,
+            status,
         }
     }
 
     pub fn run_once(&self) -> Result<LearnTickResult, EngramError> {
-        let mut result = LearnTickResult {
-            entities_linked: self.observe_phase()?,
-            ..Default::default()
-        };
+        self.mark_tick_started();
 
-        if self.config.enable_consolidation {
-            let engine = ConsolidationEngine::new(self.store.clone(), self.embedder.clone());
-            result.consolidation = Some(engine.run_consolidation(&self.config.project)?);
+        let result = (|| {
+            let mut result = LearnTickResult {
+                entities_linked: self.observe_phase()?,
+                ..Default::default()
+            };
+
+            if self.config.enable_consolidation {
+                let engine = ConsolidationEngine::new(self.store.clone(), self.embedder.clone());
+                result.consolidation = Some(engine.run_consolidation(&self.config.project)?);
+            }
+
+            if self.config.enable_evolution {
+                let evolver = GraphEvolver::new(self.store.clone(), self.embedder.clone());
+                result.evolution = Some(evolver.evolve(&self.config.project)?);
+            }
+
+            if self.config.enable_capsules {
+                result.capsules_upserted = self.capsule_phase()?;
+            }
+
+            if self.config.enable_reviews {
+                result.reviews_upserted = self.review_phase()?;
+            }
+
+            if self.config.enable_anti_patterns {
+                result.anti_patterns_found = self.anti_pattern_phase()?;
+            }
+
+            if self.config.enable_injection_snapshots {
+                result.snapshots_written = self.injection_phase()?;
+            }
+
+            Ok(result)
+        })();
+
+        match &result {
+            Ok(tick) => self.mark_tick_succeeded(tick),
+            Err(err) => self.mark_tick_failed(err),
         }
 
-        if self.config.enable_evolution {
-            let evolver = GraphEvolver::new(self.store.clone(), self.embedder.clone());
-            result.evolution = Some(evolver.evolve(&self.config.project)?);
-        }
-
-        if self.config.enable_capsules {
-            result.capsules_upserted = self.capsule_phase()?;
-        }
-
-        if self.config.enable_reviews {
-            result.reviews_upserted = self.review_phase()?;
-        }
-
-        if self.config.enable_anti_patterns {
-            result.anti_patterns_found = self.anti_pattern_phase()?;
-        }
-
-        if self.config.enable_injection_snapshots {
-            result.snapshots_written = self.injection_phase()?;
-        }
-
-        Ok(result)
+        result
     }
 
     pub fn run_loop(&self) -> Result<(), EngramError> {
@@ -308,6 +323,53 @@ impl LearnDaemon {
     fn ensure_session(&self) -> Result<String, EngramError> {
         self.store.create_session(&self.config.project)
     }
+
+    #[allow(clippy::collapsible_if)]
+    fn mark_tick_started(&self) {
+        if let Some(status) = &self.status {
+            if let Ok(mut status) = status.lock() {
+                status.enabled = true;
+                status.project = self.config.project.clone();
+                status.interval_seconds = self.config.interval_seconds;
+                status.last_started_at = Some(Utc::now().to_rfc3339());
+                status.last_error = None;
+            }
+        }
+    }
+
+    #[allow(clippy::collapsible_if)]
+    fn mark_tick_succeeded(&self, result: &LearnTickResult) {
+        if let Some(status) = &self.status {
+            if let Ok(mut status) = status.lock() {
+                status.enabled = true;
+                status.project = self.config.project.clone();
+                status.interval_seconds = self.config.interval_seconds;
+                status.ticks_run += 1;
+                status.last_completed_at = Some(Utc::now().to_rfc3339());
+                status.last_error = None;
+                status.last_tick = Some(LearnTickStatus {
+                    entities_linked: result.entities_linked,
+                    capsules_upserted: result.capsules_upserted,
+                    reviews_upserted: result.reviews_upserted,
+                    anti_patterns_found: result.anti_patterns_found,
+                    snapshots_written: result.snapshots_written,
+                });
+            }
+        }
+    }
+
+    #[allow(clippy::collapsible_if)]
+    fn mark_tick_failed(&self, err: &EngramError) {
+        if let Some(status) = &self.status {
+            if let Ok(mut status) = status.lock() {
+                status.enabled = true;
+                status.project = self.config.project.clone();
+                status.interval_seconds = self.config.interval_seconds;
+                status.last_completed_at = Some(Utc::now().to_rfc3339());
+                status.last_error = Some(err.to_string());
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for LearnTickResult {
@@ -412,6 +474,7 @@ mod tests {
                 ..Default::default()
             },
             None,
+            None,
         );
 
         let result = daemon.run_once().unwrap();
@@ -431,6 +494,7 @@ mod tests {
                 enable_anti_patterns: false,
                 ..Default::default()
             },
+            None,
             None,
         );
 
@@ -453,9 +517,34 @@ mod tests {
                 ..Default::default()
             },
             None,
+            None,
         );
 
         let upserted = daemon.review_phase().unwrap();
         assert!(upserted > 0);
+    }
+
+    #[test]
+    fn run_once_updates_shared_status() {
+        let store = seed_store("test");
+        let status = Arc::new(Mutex::new(LearnDaemonStatus::enabled("test".into(), 60)));
+        let daemon = LearnDaemon::new(
+            store,
+            LearnDaemonConfig {
+                project: "test".into(),
+                ..Default::default()
+            },
+            None,
+            Some(status.clone()),
+        );
+
+        let result = daemon.run_once().unwrap();
+        assert!(result.entities_linked > 0);
+
+        let snapshot = status.lock().unwrap().clone();
+        assert_eq!(snapshot.ticks_run, 1);
+        assert!(snapshot.last_started_at.is_some());
+        assert!(snapshot.last_completed_at.is_some());
+        assert!(snapshot.last_tick.is_some());
     }
 }
