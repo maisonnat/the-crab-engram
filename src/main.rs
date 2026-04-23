@@ -23,7 +23,7 @@ const BIN_NAME: &str = "the-crab-engram";
 #[derive(Parser)]
 #[command(
     name = "the-crab-engram",
-    version = "2.0.0",
+    version = env!("CARGO_PKG_VERSION"),
     about = "Persistent memory for AI agents"
 )]
 struct Cli {
