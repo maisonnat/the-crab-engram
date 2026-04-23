@@ -22,11 +22,7 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             use_cross: true
-          # macOS x86_64
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            use_cross: false
-          # macOS aarch64
+          # macOS aarch64 (Apple Silicon — native on macos-latest)
           - target: aarch64-apple-darwin
             os: macos-latest
             use_cross: false
@@ -102,6 +98,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
       - name: Install cargo-deb
         run: cargo install cargo-deb
