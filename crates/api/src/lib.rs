@@ -10,9 +10,14 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
-use engram_core::{ObservationType, Scope};
-use engram_learn::{AntiPatternDetector, ConsolidationEngine, SmartInjector};
-use engram_store::{AddObservationParams, SearchOptions, Storage, UpdateObservationParams};
+use engram_core::{ObservationType, RelationType, Scope};
+use engram_learn::{
+    AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, HeuristicSynthesizer, MemoryStream,
+    SmartInjector,
+};
+use engram_store::{
+    AddEdgeParams, AddObservationParams, SearchOptions, Storage, UpdateObservationParams,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LearnTickStatus {
@@ -102,6 +107,19 @@ pub fn create_router(state: AppState) -> Router {
         .route("/graph/{id}", get(graph_edges))
         .route("/inject", post(inject))
         .route("/antipatterns", get(antipatterns))
+        // Phase 1: Knowledge graph + intelligence endpoints
+        .route("/relate", post(relate))
+        .route("/stream", post(stream))
+        .route("/synthesize", post(synthesize))
+        .route("/timeline/{id}", get(timeline))
+        .route("/beliefs/{subject}", get(beliefs))
+        .route("/reviews", get(reviews))
+        .route("/boundaries", get(list_boundaries).post(upsert_boundary))
+        // Phase 2: Capture + pin endpoints
+        .route("/observations/{id}/pin", post(pin_observation))
+        .route("/capture/error", post(capture_error))
+        .route("/capture/git", post(capture_git))
+        .route("/capture/passive", post(capture_passive))
         // Hermes memory provider endpoints
         .route("/sync", post(sync_turn))
         .route("/remember", post(remember))
@@ -542,6 +560,489 @@ async fn antipatterns(State(state): State<AppState>) -> impl IntoResponse {
         }
         .into_response(),
     }
+}
+
+// ── Phase 1: Knowledge Graph + Intelligence Endpoints ───────────
+
+#[derive(Deserialize)]
+pub struct RelateRequest {
+    pub source_id: i64,
+    pub target_id: i64,
+    pub relation: String,
+    pub weight: Option<f64>,
+}
+
+/// POST /relate — Create a typed edge between two observations.
+async fn relate(
+    State(state): State<AppState>,
+    Json(req): Json<RelateRequest>,
+) -> impl IntoResponse {
+    let relation = match req.relation.as_str() {
+        "caused_by" => RelationType::CausedBy,
+        "related_to" => RelationType::RelatedTo,
+        "supersedes" => RelationType::Supersedes,
+        "blocks" => RelationType::Blocks,
+        "part_of" => RelationType::PartOf,
+        _ => return ApiError {
+            error: format!(
+                "invalid relation '{}'. Use: caused_by, related_to, supersedes, blocks, part_of",
+                req.relation
+            ),
+        }
+        .into_response(),
+    };
+
+    let params = AddEdgeParams {
+        source_id: req.source_id,
+        target_id: req.target_id,
+        relation,
+        weight: req.weight.unwrap_or(1.0),
+        auto_detected: false,
+    };
+
+    match state.store.add_edge(&params) {
+        Ok(edge_id) => Json(serde_json::json!({
+            "edge_id": edge_id,
+            "source_id": params.source_id,
+            "target_id": params.target_id,
+            "relation": req.relation,
+            "weight": params.weight,
+        }))
+        .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct StreamRequest {
+    pub mode: Option<String>,
+    pub file_path: Option<String>,
+    pub task_description: Option<String>,
+    pub content: Option<String>,
+    pub text: Option<String>,
+}
+
+/// POST /stream — Detect memory events (file context, déjà-vu, anti-patterns, etc.).
+async fn stream(
+    State(state): State<AppState>,
+    Json(req): Json<StreamRequest>,
+) -> impl IntoResponse {
+    let stream_engine = MemoryStream::new(state.store.clone(), None);
+    let mode = req.mode.as_deref().unwrap_or("file_context");
+
+    let events = match mode {
+        "file_context" => req
+            .file_path
+            .as_deref()
+            .map(|fp| {
+                stream_engine
+                    .detect_file_context(&state.project, fp)
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default(),
+        "deja_vu" => req
+            .task_description
+            .as_deref()
+            .map(|t| {
+                stream_engine
+                    .detect_deja_vu(&state.project, t)
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default(),
+        "anti_patterns" => stream_engine
+            .detect_anti_pattern_warnings(&state.project, req.content.as_deref().unwrap_or(""))
+            .unwrap_or_default(),
+        "pending_reviews" => stream_engine
+            .detect_pending_reviews(&state.project)
+            .unwrap_or_default(),
+        "entities" => stream_engine
+            .detect_entities(req.text.as_deref().unwrap_or(""))
+            .unwrap_or_default(),
+        _ => vec![],
+    };
+
+    let event_strings: Vec<String> = events.iter().map(|e| format!("{e}")).collect();
+    Json(serde_json::json!({
+        "count": event_strings.len(),
+        "events": event_strings,
+    }))
+    .into_response()
+}
+
+#[derive(Deserialize)]
+pub struct SynthesizeRequest {
+    pub topic: String,
+}
+
+/// POST /synthesize — Build/update a knowledge capsule for a topic.
+async fn synthesize(
+    State(state): State<AppState>,
+    Json(req): Json<SynthesizeRequest>,
+) -> impl IntoResponse {
+    let builder = CapsuleBuilder::new(state.store.clone(), Box::new(HeuristicSynthesizer));
+    match builder.build_capsule(&state.project, &req.topic) {
+        Ok(capsule) => {
+            let confidence = capsule.confidence;
+            let source_count = capsule.source_observations.len();
+            let decisions_count = capsule.key_decisions.len();
+            let issues_count = capsule.known_issues.len();
+            match state.store.upsert_capsule(&capsule) {
+                Ok(id) => Json(serde_json::json!({
+                    "capsule_id": id,
+                    "topic": req.topic,
+                    "confidence": confidence,
+                    "source_observations": source_count,
+                    "key_decisions": decisions_count,
+                    "known_issues": issues_count,
+                }))
+                .into_response(),
+                Err(e) => ApiError {
+                    error: format!("capsule save failed: {e}"),
+                }
+                .into_response(),
+            }
+        }
+        Err(e) => ApiError {
+            error: format!("synthesis failed: {e}"),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct TimelineQuery {
+    pub window: Option<usize>,
+}
+
+/// GET /timeline/{id} — Get observations surrounding an observation in time.
+async fn timeline(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Query(params): Query<TimelineQuery>,
+) -> impl IntoResponse {
+    let window = params.window.unwrap_or(5);
+    match state.store.get_timeline(id, window) {
+        Ok(entries) => {
+            let items: Vec<serde_json::Value> = entries
+                .iter()
+                .map(|entry| {
+                    serde_json::json!({
+                        "observation": {
+                            "id": entry.observation.id,
+                            "title": entry.observation.title,
+                            "type": format!("{:?}", entry.observation.r#type),
+                            "created_at": entry.observation.created_at,
+                        },
+                        "position": format!("{:?}", entry.position),
+                    })
+                })
+                .collect();
+            Json(items).into_response()
+        }
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+/// GET /beliefs/{subject} — Query beliefs about a subject.
+async fn beliefs(State(state): State<AppState>, Path(subject): Path<String>) -> impl IntoResponse {
+    match state.store.get_beliefs(&subject) {
+        Ok(beliefs) => {
+            let items: Vec<serde_json::Value> = beliefs
+                .iter()
+                .map(|(predicate, value, state, confidence, ts)| {
+                    serde_json::json!({
+                        "subject": subject,
+                        "predicate": predicate,
+                        "value": value,
+                        "confidence": confidence,
+                        "state": state,
+                        "timestamp": ts,
+                    })
+                })
+                .collect();
+            Json(items).into_response()
+        }
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ReviewsQuery {
+    pub limit: Option<usize>,
+}
+
+/// GET /reviews — Get pending spaced-repetition review items.
+async fn reviews(
+    State(state): State<AppState>,
+    Query(params): Query<ReviewsQuery>,
+) -> impl IntoResponse {
+    let limit = params.limit.unwrap_or(10);
+    match state.store.get_pending_reviews(Some(&state.project), limit) {
+        Ok(items) => {
+            let reviews: Vec<serde_json::Value> = items
+                .iter()
+                .map(|(obs_id, interval, ease)| {
+                    serde_json::json!({
+                        "observation_id": obs_id,
+                        "interval_days": interval,
+                        "ease_factor": ease,
+                    })
+                })
+                .collect();
+            Json(reviews).into_response()
+        }
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+/// GET /boundaries — List all knowledge boundaries.
+async fn list_boundaries(State(state): State<AppState>) -> impl IntoResponse {
+    match state.store.get_boundaries() {
+        Ok(boundaries) => {
+            let items: Vec<serde_json::Value> = boundaries
+                .iter()
+                .map(|(domain, level, evidence)| {
+                    serde_json::json!({
+                        "domain": domain,
+                        "confidence_level": level,
+                        "evidence": evidence,
+                    })
+                })
+                .collect();
+            Json(items).into_response()
+        }
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UpsertBoundaryRequest {
+    pub domain: String,
+    pub confidence_level: String,
+    pub evidence: Option<String>,
+}
+
+/// POST /boundaries — Create/update a knowledge boundary.
+async fn upsert_boundary(
+    State(state): State<AppState>,
+    Json(req): Json<UpsertBoundaryRequest>,
+) -> impl IntoResponse {
+    match state.store.upsert_boundary(
+        &req.domain,
+        &req.confidence_level,
+        req.evidence.as_deref().unwrap_or(""),
+    ) {
+        Ok(()) => Json(serde_json::json!({
+            "status": "upserted",
+            "domain": req.domain,
+            "confidence_level": req.confidence_level,
+        }))
+        .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+// ── Phase 2: Capture + Pin Endpoints ─────────────────────────────
+
+/// POST /observations/{id}/pin — Pin or unpin an observation.
+async fn pin_observation(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(req): Json<PinRequest>,
+) -> impl IntoResponse {
+    let params = UpdateObservationParams {
+        pinned: Some(req.pinned),
+        ..Default::default()
+    };
+    match state.store.update_observation(id, &params) {
+        Ok(()) => Json(serde_json::json!({
+            "status": if req.pinned { "pinned" } else { "unpinned" },
+            "observation_id": id,
+        }))
+        .into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct PinRequest {
+    pub pinned: bool,
+}
+
+#[derive(Deserialize)]
+pub struct CaptureErrorRequest {
+    pub error_type: Option<String>,
+    pub message: String,
+    pub stack_trace: Option<String>,
+    pub file: Option<String>,
+    pub line: Option<u32>,
+}
+
+/// POST /capture/error — Capture a structured error as a Bugfix observation.
+async fn capture_error(
+    State(state): State<AppState>,
+    Json(req): Json<CaptureErrorRequest>,
+) -> impl IntoResponse {
+    let session_id = state
+        .store
+        .create_session(&state.project)
+        .unwrap_or("error-capture".into());
+
+    let content = format!(
+        "Error: {}\\nMessage: {}\\n{}{}",
+        req.error_type.as_deref().unwrap_or("unknown"),
+        req.message,
+        req.stack_trace
+            .as_deref()
+            .map(|s| format!("Stack: {s}\\n"))
+            .unwrap_or_default(),
+        req.file
+            .as_deref()
+            .map(|f| format!(
+                "File: {f}{}",
+                req.line.map(|l| format!(":{l}")).unwrap_or_default()
+            ))
+            .unwrap_or_default(),
+    );
+
+    let params = AddObservationParams {
+        r#type: ObservationType::Bugfix,
+        scope: Scope::Project,
+        title: truncate(
+            &format!("Error: {}", req.error_type.as_deref().unwrap_or("unknown")),
+            80,
+        ),
+        content,
+        session_id,
+        project: state.project.clone(),
+        ..Default::default()
+    };
+
+    match state.store.insert_observation(&params) {
+        Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CaptureGitRequest {
+    pub commit_hash: Option<String>,
+    pub message: String,
+    pub files_changed: Option<Vec<String>>,
+    pub diff_summary: Option<String>,
+}
+
+/// POST /capture/git — Capture a git commit as a FileChange observation.
+async fn capture_git(
+    State(state): State<AppState>,
+    Json(req): Json<CaptureGitRequest>,
+) -> impl IntoResponse {
+    let session_id = state
+        .store
+        .create_session(&state.project)
+        .unwrap_or("git-capture".into());
+
+    let content = format!(
+        "Commit: {}\\nMessage: {}\\n{}{}",
+        req.commit_hash.as_deref().unwrap_or("unknown"),
+        req.message,
+        req.files_changed
+            .as_ref()
+            .map(|f| format!("Files: {}\\n", f.join(", ")))
+            .unwrap_or_default(),
+        req.diff_summary
+            .as_deref()
+            .map(|d| format!("Diff: {d}"))
+            .unwrap_or_default(),
+    );
+
+    let params = AddObservationParams {
+        r#type: ObservationType::FileChange,
+        scope: Scope::Project,
+        title: truncate(&format!("Commit: {}", req.message), 80),
+        content,
+        session_id,
+        project: state.project.clone(),
+        ..Default::default()
+    };
+
+    match state.store.insert_observation(&params) {
+        Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
+        Err(e) => ApiError {
+            error: e.to_string(),
+        }
+        .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CapturePassiveRequest {
+    pub text: String,
+}
+
+/// POST /capture/passive — Analyze text and auto-extract observations.
+async fn capture_passive(
+    State(state): State<AppState>,
+    Json(req): Json<CapturePassiveRequest>,
+) -> impl IntoResponse {
+    let stream_engine = MemoryStream::new(state.store.clone(), None);
+
+    // Detect entities and anti-pattern warnings from the text
+    let entities = stream_engine.detect_entities(&req.text).unwrap_or_default();
+    let warnings = stream_engine
+        .detect_anti_pattern_warnings(&state.project, &req.text)
+        .unwrap_or_default();
+
+    // Store the raw text as a passive capture observation
+    let session_id = state
+        .store
+        .create_session(&state.project)
+        .unwrap_or("passive".into());
+
+    let params = AddObservationParams {
+        r#type: ObservationType::Manual,
+        scope: Scope::Project,
+        title: truncate(&req.text, 80),
+        content: req.text,
+        session_id,
+        project: state.project.clone(),
+        ..Default::default()
+    };
+
+    let obs_id = state.store.insert_observation(&params);
+
+    Json(serde_json::json!({
+        "observation_id": obs_id.unwrap_or(-1),
+        "entities_detected": entities.len(),
+        "warnings_detected": warnings.len(),
+        "entity_events": entities.iter().map(|e| format!("{e}")).collect::<Vec<_>>(),
+        "warning_events": warnings.iter().map(|w| format!("{w}")).collect::<Vec<_>>(),
+    }))
+    .into_response()
 }
 
 #[cfg(test)]
