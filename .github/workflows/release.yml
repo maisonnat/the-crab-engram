@@ -18,10 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux x86_64 GNU — uses cross with openssl vendored
+          # Linux x86_64 GNU — native build on ubuntu
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            use_cross: true
+            use_cross: false
           # macOS aarch64 (Apple Silicon — native on macos-latest)
           - target: aarch64-apple-darwin
             os: macos-latest
@@ -37,6 +37,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
       - name: Install cross (Linux)
         if: matrix.use_cross

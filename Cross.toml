@@ -1,2 +1,1 @@
-[target.x86_64-unknown-linux-gnu]
-pre-build = ["apt-get update && apt-get install -y libssl-dev"]
+# Cross.toml — not currently used (native builds on all targets)
