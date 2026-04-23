@@ -1,2 +1,2 @@
-# Cross config for x86_64-unknown-linux-gnu
-# Vendored openssl (from Cargo.toml) compiles from source in the container
+[target.x86_64-unknown-linux-gnu]
+pre-build = ["apt-get update && apt-get install -y libssl-dev"]
