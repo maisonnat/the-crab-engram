@@ -1,11 +1,2 @@
-[target.x86_64-unknown-linux-gnu]
-pre-build = ["apt-get update && apt-get install -y libssl-dev"]
-
-[target.aarch64-unknown-linux-gnu]
-pre-build = ["apt-get update && apt-get install -y libssl-dev:arm64"]
-
-[target.x86_64-unknown-linux-musl]
-pre-build = ["apt-get update && apt-get install -y libssl-dev"]
-
-[target.aarch64-unknown-linux-musl]
-pre-build = ["apt-get update && apt-get install -y libssl-dev:arm64"]
+# Cross config for x86_64-unknown-linux-gnu
+# Vendored openssl (from Cargo.toml) compiles from source in the container
