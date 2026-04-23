@@ -10,6 +10,9 @@ use reqwest::blocking as reqwest_blocking;
 use self_update::backends::github::{ReleaseList, Update};
 use sha2::{Digest, Sha256};
 
+use crate::learn_daemon::{LearnDaemon, LearnDaemonConfig, format_tick_summary};
+
+mod learn_daemon;
 mod opencode_setup;
 
 /// GitHub repository owner for self-update
@@ -161,9 +164,27 @@ enum Commands {
         /// Port to listen on
         #[arg(long, default_value = "7437")]
         port: u16,
+        /// Run the autonomous learn daemon alongside the API server
+        #[arg(long)]
+        learn_daemon: bool,
+        /// Learn daemon interval in seconds
+        #[arg(long, default_value = "60")]
+        learn_interval: u64,
     },
     /// Launch interactive Terminal UI
     Tui,
+    /// Run the autonomous learning pipeline
+    Learn {
+        /// Run continuously in background loop
+        #[arg(long)]
+        daemon: bool,
+        /// Run a single learn tick and exit
+        #[arg(long)]
+        once: bool,
+        /// Interval between ticks when running as daemon
+        #[arg(long, default_value = "60")]
+        interval: u64,
+    },
     /// Run memory consolidation (merge duplicates, mark obsolete, find conflicts)
     Consolidate {
         /// Dry run (don't actually modify data)
@@ -619,15 +640,41 @@ async fn main() -> Result<()> {
             eprintln!("update: run `the-crab-engram self update` to check for updates");
         }
 
-        Commands::Serve { port } => {
+        Commands::Serve {
+            port,
+            learn_daemon,
+            learn_interval,
+        } => {
             let store = Arc::new(open_store(cli.db)?);
+
+            if learn_daemon {
+                let daemon_store: Arc<dyn Storage> = store.clone();
+                let config = LearnDaemonConfig {
+                    project: cli.project.clone(),
+                    interval_seconds: learn_interval,
+                    ..Default::default()
+                };
+                std::thread::spawn(move || {
+                    let daemon = LearnDaemon::new(daemon_store, config, None);
+                    if let Err(err) = daemon.run_loop() {
+                        tracing::error!(?err, "learn daemon stopped");
+                    }
+                });
+            }
+
             let state = engram_api::AppState {
                 store,
                 project: cli.project.clone(),
             };
             let app = engram_api::create_router(state);
             let addr = format!("0.0.0.0:{port}");
-            eprintln!("The Crab Engram v2.0.0 — HTTP API on {addr}");
+            eprintln!(
+                "The Crab Engram v{} — HTTP API on {addr}",
+                env!("CARGO_PKG_VERSION")
+            );
+            if learn_daemon {
+                eprintln!("Learn daemon enabled — interval: {}s", learn_interval);
+            }
             let listener = tokio::net::TcpListener::bind(&addr).await?;
             axum::serve(listener, app).await?;
         }
@@ -635,6 +682,34 @@ async fn main() -> Result<()> {
         Commands::Tui => {
             let store = open_store(cli.db)?;
             engram_tui::run_tui(store, &cli.project)?;
+        }
+
+        Commands::Learn {
+            daemon,
+            once,
+            interval,
+        } => {
+            let store: Arc<dyn Storage> = Arc::new(open_store(cli.db)?);
+            let daemon_runner = LearnDaemon::new(
+                store,
+                LearnDaemonConfig {
+                    project: cli.project.clone(),
+                    interval_seconds: interval,
+                    ..Default::default()
+                },
+                None,
+            );
+
+            if daemon || !once {
+                eprintln!(
+                    "Starting learn daemon for project '{}' ({}s interval)",
+                    cli.project, interval
+                );
+                daemon_runner.run_loop()?;
+            } else {
+                let result = daemon_runner.run_once()?;
+                println!("{}", format_tick_summary(&result));
+            }
         }
 
         Commands::Consolidate { dry_run } => {

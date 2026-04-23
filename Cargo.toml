@@ -49,6 +49,8 @@ engram-mcp = { workspace = true }
 engram-api = { workspace = true }
 engram-tui = { workspace = true }
 engram-sync = { workspace = true }
+engram-learn = { workspace = true }
+engram-search = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }
