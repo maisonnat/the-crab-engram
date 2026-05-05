@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::doctor::{CheckResult, CheckStatus, DoctorCheck};
+use crate::doctor::{CheckResult, CheckStatus};
 
 // ---------------------------------------------------------------------------
 // Types

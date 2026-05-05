@@ -993,10 +993,14 @@ async fn main() -> Result<()> {
             // Agent-specific checks
             let adapters: Vec<Box<dyn engram_mcp::agents::AgentAdapter>> = match agent {
                 Some(AgentArg::Opencode) => {
-                    vec![Box::new(engram_mcp::agents::opencode::OpenCodeAdapter::new())]
+                    vec![Box::new(
+                        engram_mcp::agents::opencode::OpenCodeAdapter::new(),
+                    )]
                 }
                 Some(AgentArg::ClaudeCode) => {
-                    vec![Box::new(engram_mcp::agents::claude_code::ClaudeCodeAdapter::new())]
+                    vec![Box::new(
+                        engram_mcp::agents::claude_code::ClaudeCodeAdapter::new(),
+                    )]
                 }
                 Some(AgentArg::Cursor) => {
                     vec![Box::new(engram_mcp::agents::cursor::CursorAdapter::new())]
@@ -1039,13 +1043,17 @@ async fn main() -> Result<()> {
                         crate::opencode_setup::run_opencode_fix(&paths).await?;
                     }
                 } else {
-                    eprintln!("Auto-fix currently only supported for OpenCode. Use 'the-crab-engram install {}' to install.", 
-                        agent.map(|a| match a {
-                            AgentArg::ClaudeCode => "claude-code",
-                            AgentArg::Cursor => "cursor",
-                            AgentArg::GeminiCli => "gemini-cli",
-                            AgentArg::Opencode => "opencode",
-                        }).unwrap_or("<agent>"));
+                    eprintln!(
+                        "Auto-fix currently only supported for OpenCode. Use 'the-crab-engram install {}' to install.",
+                        agent
+                            .map(|a| match a {
+                                AgentArg::ClaudeCode => "claude-code",
+                                AgentArg::Cursor => "cursor",
+                                AgentArg::GeminiCli => "gemini-cli",
+                                AgentArg::Opencode => "opencode",
+                            })
+                            .unwrap_or("<agent>")
+                    );
                 }
             }
         }
