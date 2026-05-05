@@ -263,6 +263,7 @@ enum AgentArg {
     ClaudeCode,
     Cursor,
     GeminiCli,
+    Hermes,
     Opencode,
 }
 
@@ -793,6 +794,7 @@ async fn main() -> Result<()> {
                     AgentArg::ClaudeCode => "claude-code",
                     AgentArg::Cursor => "cursor",
                     AgentArg::GeminiCli => "gemini-cli",
+                    AgentArg::Hermes => "hermes",
                     AgentArg::Opencode => "opencode",
                 };
                 match engram_mcp::agents::detect_agent(key) {
@@ -914,6 +916,7 @@ async fn main() -> Result<()> {
                     AgentArg::ClaudeCode => "claude-code",
                     AgentArg::Cursor => "cursor",
                     AgentArg::GeminiCli => "gemini-cli",
+                    AgentArg::Hermes => "hermes",
                     AgentArg::Opencode => "opencode",
                 };
 
@@ -923,6 +926,7 @@ async fn main() -> Result<()> {
                     AgentArg::ClaudeCode => home.join(".claude").join("skills"),
                     AgentArg::Cursor => home.join(".cursor").join("rules"),
                     AgentArg::GeminiCli => home.join(".gemini").join("extensions"),
+                    AgentArg::Hermes => home.join(".hermes").join("skills"),
                     AgentArg::Opencode => home.join(".config").join("opencode").join("skills"),
                 };
 
@@ -965,6 +969,9 @@ async fn main() -> Result<()> {
                 }
                 Some(AgentArg::Cursor) => {
                     vec![Box::new(engram_mcp::agents::cursor::CursorAdapter::new())]
+                }
+                Some(AgentArg::Hermes) => {
+                    vec![Box::new(engram_mcp::agents::hermes::HermesAdapter::new())]
                 }
                 Some(AgentArg::GeminiCli) => {
                     // Gemini CLI doesn't support MCP natively — warn and skip
@@ -1238,8 +1245,37 @@ fn generate_skill_md(agent: &AgentArg) -> String {
         AgentArg::ClaudeCode => claude_code_skill(),
         AgentArg::Cursor => cursor_skill(),
         AgentArg::GeminiCli => gemini_cli_skill(),
+        AgentArg::Hermes => hermes_skill(),
         AgentArg::Opencode => opencode_skill(),
     }
+}
+
+/// Hermes SKILL.md — concise, action-driven, for a context-aware agent.
+fn hermes_skill() -> String {
+    r#"# Engram — Persistent Memory Protocol
+
+Engram is your persistent memory backend. You have an MCP server (32 tools)
+and a native Hermes memory provider (prefetch + sync_turn).
+
+## 4-Step Protocol
+
+1. **START** — First turn: `mem_session_start(project="<project>")`
+2. **PRE** — Before implementing: `mem_search(query="<what>")`
+3. **MID** — After resolving: `mem_save(type="Bugfix|Decision|...", title="...", content="...")`
+4. **END** — Wrapping up: `mem_session_end(id="<id>", summary="<summary>")"
+
+## Types
+
+| Type        | When                             |
+|-------------|----------------------------------|
+| Bugfix      | Fixed a bug — root cause + fix   |
+| Decision    | Architectural choice — tradeoffs |
+| Pattern     | Recurring solution               |
+| Discovery   | Non-obvious insight              |
+| Config      | Environment/tooling change       |
+| Architecture| System design decision           |
+"#
+    .to_string()
 }
 
 /// Claude Code SKILL.md — structured, formal, turn-by-turn protocol.
