@@ -40,3 +40,4 @@ engram-chunks/
 .opencode/
 .specify/
 AGENTS.md
+crates/search/.fastembed_cache/

@@ -97,7 +97,7 @@ impl NomicBertEmbeddings {
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> candle_core::Result<Tensor> {
         let we = self.word_embeddings.forward(input_ids)?;
         let te = self.token_type_embeddings.forward(token_type_ids)?;
-        self.ln.forward(&(we + te)?)
+        self.ln.forward(&we.add(&te)?)
     }
 }
 
@@ -120,7 +120,7 @@ impl NomicBertGatedMLP {
         // SwiGLU: silu(fc12(x)) * fc11(x) → fc2
         let y = self.fc11.forward(x)?;
         let gate = self.fc12.forward(x)?.silu()?;
-        self.fc2.forward(&(y * gate)?)
+        self.fc2.forward(&y.mul(&gate)?)
     }
 }
 
@@ -165,7 +165,7 @@ impl NomicBertAttention {
         let attn = attn.broadcast_mul(&scale)?;
 
         let attn = if let Some(m) = mask {
-            candle_nn::ops::softmax(&(attn + m)?, 3)?
+            candle_nn::ops::softmax(&(attn.add(&m)?), 3)?
         } else {
             candle_nn::ops::softmax(&attn, 3)?
         };
@@ -198,7 +198,7 @@ impl NomicBertBlock {
         let a = self.attn.forward(x, mask)?;
         let x = self.norm1.forward(&(a + x)?)?;
         let m = self.mlp.forward(&x)?;
-        self.norm2.forward(&(m + x)?)
+        self.norm2.forward(&m.add(&x)?)
     }
 }
 
@@ -286,7 +286,7 @@ impl CandleNomicEmbedder {
     }
 
     /// Generate a 384-dimensional embedding vector.
-    fn embed_inner(&self, text: &str) -> Result<Vec<f32>, EmbedderError> {
+    pub fn embed_inner(&self, text: &str) -> Result<Vec<f32>, EmbedderError> {
         let encoding = self
             .tokenizer
             .encode(text, true)
