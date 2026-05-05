@@ -212,6 +212,9 @@ enum Commands {
         /// Show what would be done without writing
         #[arg(long)]
         dry_run: bool,
+        /// Also enable and start the engram systemd service
+        #[arg(long)]
+        start: bool,
     },
     /// Setup The Crab Engram for a specific AI agent
     Setup {
@@ -231,12 +234,12 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Diagnose integration issues
+    /// Diagnose and repair integration issues
     Doctor {
-        /// Agent to diagnose
+        /// Agent to diagnose (all detected if omitted)
         #[arg(value_enum)]
         agent: Option<AgentArg>,
-        /// Auto-repair failures (opencode only)
+        /// Auto-repair MCP connection failures for all detected agents
         #[arg(long)]
         fix: bool,
     },
@@ -781,6 +784,7 @@ async fn main() -> Result<()> {
             agent,
             all,
             dry_run,
+            start,
         } => {
             let adapters: Vec<Box<dyn engram_mcp::agents::AgentAdapter>> = if all {
                 engram_mcp::agents::all_adapters()
@@ -813,6 +817,33 @@ async fn main() -> Result<()> {
                 match adapter.install(dry_run) {
                     Ok(result) => result.display_table(),
                     Err(e) => eprintln!("Error: {e}"),
+                }
+            }
+
+            if start {
+                if dry_run {
+                    println!("\n── systemd ──");
+                    println!(
+                        "  ✅ [dry-run] Would run: systemctl --user enable --now engram.service"
+                    );
+                } else {
+                    println!("\n── systemd ──");
+                    match std::process::Command::new("systemctl")
+                        .args(["--user", "enable", "--now", "engram.service"])
+                        .status()
+                    {
+                        Ok(status) if status.success() => {
+                            println!(
+                                "  ✅ Engram systemd service enabled and started successfully."
+                            );
+                        }
+                        Ok(status) => {
+                            eprintln!("  ⚠️ systemctl exited with code: {}", status);
+                        }
+                        Err(e) => {
+                            eprintln!("  ❌ Failed to run systemctl: {e}");
+                        }
+                    }
                 }
             }
         }
@@ -966,24 +997,59 @@ async fn main() -> Result<()> {
             all_results.push(db_result);
 
             doctor::display_results(&all_results);
-            // Note: auto-fix currently only available for OpenCode
+
+            // --fix mode: repair failing MCP connections for all detected agents
             if fix {
-                if let Some(AgentArg::Opencode) = agent {
-                    if let Ok(paths) = engram_mcp::opencode_paths::OpenCodePaths::detect() {
-                        crate::opencode_setup::run_opencode_fix(&paths).await?;
+                let mut fixed_any = false;
+                for adapter in &adapters {
+                    let checks = adapter.doctor();
+                    let has_failures = checks.iter().any(|c| c.status == CheckStatus::Fail);
+                    if has_failures {
+                        eprintln!("\n  🔧 Fixing {} MCP connection...", adapter.name());
+                        match adapter.install(false) {
+                            Ok(result) => {
+                                for action in &result.actions {
+                                    use engram_mcp::agents::ActionKind;
+                                    if !matches!(action.action, ActionKind::Skipped) {
+                                        eprintln!("    {} — {}", action.target, action.detail);
+                                        fixed_any = true;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("  ✗ Failed to fix {}: {e}", adapter.name());
+                            }
+                        }
+                    }
+                }
+
+                if fixed_any {
+                    // Restart engram service so agents reconnect
+                    eprintln!("\n  🔄 Restarting engram service...");
+                    let restart = std::process::Command::new("systemctl")
+                        .args(["--user", "restart", "engram.service"])
+                        .status();
+                    match restart {
+                        Ok(status) if status.success() => {
+                            eprintln!("  ✓ engram service restarted");
+                            // Brief pause for service to come up
+                            std::thread::sleep(std::time::Duration::from_secs(2));
+                            let verify = doctor::check_server_running();
+                            eprintln!(
+                                "  Post-restart health: {} — {}",
+                                verify.status, verify.message
+                            );
+                        }
+                        Ok(status) => {
+                            eprintln!("  ⚠ engram restart exited with code {status}");
+                        }
+                        Err(e) => {
+                            eprintln!("  ⚠ Could not restart engram service: {e}");
+                            eprintln!("  Try manually: systemctl --user restart engram.service");
+                        }
                     }
                 } else {
-                    eprintln!(
-                        "Auto-fix currently only supported for OpenCode. Use 'the-crab-engram install {}' to install.",
-                        agent
-                            .map(|a| match a {
-                                AgentArg::ClaudeCode => "claude-code",
-                                AgentArg::Cursor => "cursor",
-                                AgentArg::GeminiCli => "gemini-cli",
-                                AgentArg::Opencode => "opencode",
-                            })
-                            .unwrap_or("<agent>")
-                    );
+                    eprintln!("\n  ✓ All agents OK — no fixes needed");
                 }
             }
         }
@@ -1166,60 +1232,300 @@ fn handle_self_update(check_only: bool, dry_run: bool) -> Result<()> {
 }
 
 /// Generate SKILL.md content for agent integration.
+/// Each agent gets a tailored workflow prompt tuned to its conventions.
 fn generate_skill_md(agent: &AgentArg) -> String {
-    let _ = agent; // same content for all agents for now
+    match agent {
+        AgentArg::ClaudeCode => claude_code_skill(),
+        AgentArg::Cursor => cursor_skill(),
+        AgentArg::GeminiCli => gemini_cli_skill(),
+        AgentArg::Opencode => opencode_skill(),
+    }
+}
+
+/// Claude Code SKILL.md — structured, formal, turn-by-turn protocol.
+fn claude_code_skill() -> String {
     r#"# Engram — Persistent Memory Protocol
 
-## Goal
-Capture and retrieve learnings across coding sessions.
+You have access to Engram, a persistent memory engine. Follow this protocol
+**every turn** to build cross-session context.
 
-## Instructions
+---
 
-### Session Management
-1. Start each session: call `mem_session_start` with your project name
-2. End each session: call `mem_session_end` with a brief summary
+## ── Protocol ──
 
-### Save Learnings
-After significant work, save observations using `mem_save`:
-- **Bugfix**: When you fix a bug — include root cause and fix
-- **Decision**: When you make an architectural choice — include tradeoffs
-- **Pattern**: When you notice a recurring pattern
-- **Discovery**: When you learn something non-obvious about the codebase
-- **Config**: When you change configuration or environment setup
+### ▶ START (new session)
 
-### Search Before Acting
-Before implementing something new, call `mem_search` to check if:
-- This was done before
-- There are relevant patterns or decisions
-- There are known issues or anti-patterns
+```
+mem_session_start(project="<project-name>")
+```
 
-### Capture Passive Learnings
-After completing work, call `mem_capture_passive` with your output to auto-extract:
-- Test results
-- Error patterns
-- Code changes
+Always call this on the first turn of a session. It initialises a fresh
+memory scope.
 
-## Tools Available
-- `mem_save` — Save an observation
-- `mem_search` — Search memories by keyword
-- `mem_context` — Get session context
+### ◇ PRE (before implementing)
+
+Before writing any new code, running a command, or modifying a file:
+
+```
+mem_search(query="<what you are about to do>")
+```
+
+Check if:
+- A similar fix or feature was implemented before
+- There are architectural decisions relevant to this area
+- Known pitfalls, anti-patterns, or blocked approaches exist
+
+**Do not skip this step.** If search returns results, read the relevant
+observations before proceeding.
+
+### ◇ MID (after resolving something)
+
+When you fix a bug, make a decision, discover a pattern, or change
+configuration:
+
+```
+mem_save(
+    type="Bugfix|Decision|Pattern|Discovery|Config|Architecture",
+    title="<short title>",
+    content="<what happened, root cause, resolution>",
+    scope="Project",
+)
+```
+
+**Type guide:**
+| Type         | When                         | Include                        |
+|--------------|------------------------------|--------------------------------|
+| `Bugfix`     | You fix a bug                | Root cause + how you fixed it  |
+| `Decision`   | Architectural / design choice | Tradeoffs considered + winner  |
+| `Pattern`    | Recurring solution observed   | When to use, when to avoid     |
+| `Discovery`  | Non-obvious codebase insight  | What you learned               |
+| `Config`     | Environment / tooling change  | Before/after values            |
+| `Architecture` | System structure decision    | Rationale + alternatives       |
+
+### ■ END (wrapping up)
+
+Before the session ends:
+
+```
+mem_session_end(
+    id="<session-id>",
+    summary="<one-sentence summary of what was accomplished>",
+)
+```
+
+Optionally call `mem_capture_passive` with your final output to auto-extract
+test results, error patterns, and code changes.
+
+---
+
+## ── Tools ──
+
+| Tool                    | Purpose                              |
+|-------------------------|--------------------------------------|
+| `mem_save`              | Persist an observation               |
+| `mem_search`            | Semantic search across memories      |
+| `mem_context`           | Get current session context          |
+| `mem_session_start`     | Begin a session                      |
+| `mem_session_end`       | End a session with summary           |
+| `mem_get_observation`   | Fetch full observation by ID         |
+| `mem_suggest_topic_key` | Generate a topic key (hierarchical)  |
+| `mem_capture_passive`   | Auto-extract learnings from output   |
+| `mem_save_prompt`       | Save the user's prompt for context   |
+| `mem_update`            | Update an existing observation       |
+| `mem_stats`             | Project statistics (admin)           |
+| `mem_timeline`          | Timeline around an observation       |
+
+## ── Topic Keys ──
+
+Use `mem_suggest_topic_key` to generate keys. Convention:
+- `architecture/<area>` — e.g. `architecture/auth-jwt-flow`
+- `bug/<description>` — e.g. `bug/fix-n1-query`
+- `decision/<topic>` — e.g. `decision/use-sqlite-over-pg`
+- `pattern/<pattern-name>` — e.g. `pattern/repository-layer`
+"#
+    .to_string()
+}
+
+/// Cursor SKILL.md — concise, actionable, tab-complete friendly.
+fn cursor_skill() -> String {
+    r#"# Engram — Persistent Memory Protocol
+
+Engram gives you persistent memory across sessions. Use it to stop
+re-discovering the same problems.
+
+---
+
+## Workflow (4-step protocol)
+
+**1. START** — First turn of any session:
+```
+mem_session_start(project="<project>")
+```
+
+**2. PRE** — Before implementing anything:
+```
+mem_search(query="<what you're about to do>")
+```
+Do not skip this. Past decisions and bugs are here.
+
+**3. MID** — After fixing/deciding/discovering:
+```
+mem_save(type="Bugfix|Decision|Pattern|Discovery|Config", title="...", content="...", scope="Project")
+```
+
+| Type        | Save when...                     |
+|-------------|----------------------------------|
+| `Bugfix`    | You fix something — include root cause |
+| `Decision`  | You make a call — include tradeoffs    |
+| `Pattern`   | You notice a recurring solution       |
+| `Discovery` | You learn a non-obvious thing         |
+| `Config`    | You change env/tool setup             |
+
+**4. END** — Wrapping up:
+```
+mem_session_end(id="<session-id>", summary="<what you did>")
+```
+
+---
+
+## Tools
+
+`mem_save` — Save observation
+`mem_search` — Semantic search
+`mem_session_start` — Begin session
+`mem_session_end` — End session
+`mem_context` — Session context
+`mem_get_observation` — Full detail by ID
+`mem_suggest_topic_key` — Generate key
+`mem_capture_passive` — Auto-extract from output
+`mem_update` — Edit an observation
+"#
+    .to_string()
+}
+
+/// Gemini CLI SKILL.md — clean, organised, Google-style.
+fn gemini_cli_skill() -> String {
+    r#"# Engram — Persistent Memory Protocol
+
+Engram provides persistent cross-session memory for AI coding agents.
+
+---
+
+## How It Works
+
+### 🟢 Begin Session
+`mem_session_start(project="<project>")`
+
+### 🔵 Search Before Acting
+`mem_search(query="<thing to check>")`
+Always search before writing new code or making changes.
+
+### 🟡 Save Learnings
+`mem_save(type="<see types>", title="<title>", content="<what happened>")`
+
+**Types:**
+- `Bugfix` — root cause + fix
+- `Decision` — tradeoffs + choice
+- `Pattern` — when/why to use
+- `Discovery` — non-obvious insight
+- `Config` — env/tooling change
+
+### 🔴 End Session
+`mem_session_end(id="<id>", summary="<summary>")`
+
+---
+
+## All Tools
+
 - `mem_session_start` — Start a session
 - `mem_session_end` — End a session
-- `mem_get_observation` — Get full observation by ID
-- `mem_suggest_topic_key` — Suggest topic key
-- `mem_capture_passive` — Extract learnings from output
+- `mem_save` — Save an observation
+- `mem_search` — Search memories
+- `mem_context` — Current session context
+- `mem_get_observation` — Full detail
+- `mem_suggest_topic_key` — Generate topic key
+- `mem_capture_passive` — Auto-extract
 - `mem_save_prompt` — Save user prompt
-- `mem_update` — Update an observation
-- `mem_delete` — Delete an observation (admin)
-- `mem_stats` — Project statistics (admin)
-- `mem_timeline` — Timeline around observation (admin)
-- `mem_merge_projects` — Merge projects (admin)
+- `mem_update` — Edit observation
+- `mem_stats` — Project stats
 
-## Topic Key Format
-Use `mem_suggest_topic_key` to generate keys like:
-- `architecture/auth-jwt-flow`
-- `bug/fix-n1-query`
-- `decision/use-sqlite`
+**Topic keys** use `mem_suggest_topic_key` for:
+`architecture/*`, `bug/*`, `decision/*`, `pattern/*`
+"#
+    .to_string()
+}
+
+/// OpenCode SKILL.md — references the TypeScript plugin.
+fn opencode_skill() -> String {
+    r#"# Engram — Persistent Memory Protocol
+
+Engram is installed as an OpenCode plugin (`the-crab-engram.ts`) and MCP
+server. Use its tools to maintain persistent memory across coding sessions.
+
+---
+
+## Turn Protocol
+
+```
+┌─ START ─────────────────────────────────────┐
+│  mem_session_start(project="<project>")      │
+│  → called on first turn of every session     │
+└──────────────────────────────────────────────┘
+         │
+         ▼
+┌─ PRE (before code) ─────────────────────────┐
+│  mem_search(query="<what you're about to     │
+│  do>")                                       │
+│  → check: past bugs, decisions, patterns     │
+└──────────────────────────────────────────────┘
+         │
+         ▼
+┌─ MID (after resolution) ────────────────────┐
+│  mem_save(type="Bugfix|Decision|Pattern|...",│
+│           title="<title>",                   │
+│           content="<what happened>",         │
+│           scope="Project")                   │
+└──────────────────────────────────────────────┘
+         │
+         ▼
+┌─ END (wrap up) ─────────────────────────────┐
+│  mem_session_end(id="<session-id>",          │
+│                  summary="<summary>")         │
+└──────────────────────────────────────────────┘
+```
+
+## Type Reference
+
+| Type           | When                                          |
+|----------------|-----------------------------------------------|
+| `Bugfix`       | Fixed a bug — include root cause and fix      |
+| `Decision`     | Architectural choice — include tradeoffs      |
+| `Pattern`      | Recurring solution — include applicability    |
+| `Discovery`    | Non-obvious insight — what and why            |
+| `Config`       | Configuration/environment change              |
+| `Architecture` | System design decision — include alternatives |
+
+## Tools
+
+| Tool                    | Description                              |
+|-------------------------|------------------------------------------|
+| `mem_save`              | Save an observation                      |
+| `mem_search`            | Semantic search                          |
+| `mem_context`           | Session context                          |
+| `mem_session_start`     | Begin session                            |
+| `mem_session_end`       | End session                              |
+| `mem_get_observation`   | Full observation detail                  |
+| `mem_suggest_topic_key` | Generate topic key                       |
+| `mem_capture_passive`   | Auto-extract from output                 |
+| `mem_save_prompt`       | Save user prompt                         |
+| `mem_update`           | Update observation                       |
+| `mem_stats`            | Project stats                            |
+| `mem_timeline`         | Timeline around observation              |
+
+## MCP Integration
+
+Engram runs as a stdio MCP server. The plugin at `plugins/the-crab-engram.ts`
+handles auto-discovery. All tools above are available as MCP tools.
 "#
     .to_string()
 }

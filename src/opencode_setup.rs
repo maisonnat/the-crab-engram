@@ -258,24 +258,6 @@ pub fn uninstall_opencode(paths: &OpenCodePaths, dry_run: bool) -> Result<SetupR
     Ok(SetupResult { actions })
 }
 
-/// Run auto-fix for OpenCode (separate from diagnostics).
-pub async fn run_opencode_fix(paths: &OpenCodePaths) -> Result<()> {
-    match setup_opencode(paths, "agent", "default", false) {
-        Ok(result) => {
-            for action in &result.actions {
-                if action.action != ActionKind::Skipped {
-                    eprintln!("  Fixed: {} - {}", action.target, action.detail);
-                }
-            }
-            Ok(())
-        }
-        Err(e) => {
-            eprintln!("  Auto-repair failed: {e}");
-            Err(e)
-        }
-    }
-}
-
 pub fn check_database() -> CheckResult {
     let home = match dirs::home_dir() {
         Some(h) => h,
