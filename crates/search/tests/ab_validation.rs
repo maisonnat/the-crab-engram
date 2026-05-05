@@ -12,9 +12,7 @@
 
 #![cfg(feature = "candle")]
 
-use engram_search::{
-    binary_quantize, Embedder, FastembedEngine, CandleNomicEmbedder,
-};
+use engram_search::{CandleNomicEmbedder, Embedder, FastembedEngine, binary_quantize};
 use tokio;
 
 /// Blocking helper for CandleNomicEmbedder::generate_embedding
@@ -33,8 +31,18 @@ fn ab_both_produce_384d() {
     let fast_vec = fast.embed_one("hello world").expect("fastembed embedding");
     let candle_vec = candle_embed(&candle, "hello world");
 
-    assert_eq!(fast_vec.len(), 384, "FastembedEngine should be 384d, got {}", fast_vec.len());
-    assert_eq!(candle_vec.len(), 384, "CandleNomicEmbedder should be 384d, got {}", candle_vec.len());
+    assert_eq!(
+        fast_vec.len(),
+        384,
+        "FastembedEngine should be 384d, got {}",
+        fast_vec.len()
+    );
+    assert_eq!(
+        candle_vec.len(),
+        384,
+        "CandleNomicEmbedder should be 384d, got {}",
+        candle_vec.len()
+    );
     eprintln!("✓ Both embedders produce 384d vectors");
     eprintln!("  FastembedEngine: {}d", fast_vec.len());
     eprintln!("  CandleNomicEmbedder: {}d", candle_vec.len());
@@ -50,10 +58,16 @@ fn ab_cosine_similarity_threshold() {
     let candle_vec = candle_embed(&candle, "hello world");
 
     let similarity = FastembedEngine::cosine_similarity(&fast_vec, &candle_vec);
-    eprintln!("✓ Cosine similarity (fastembed vs candle): {:.6}", similarity);
+    eprintln!(
+        "✓ Cosine similarity (fastembed vs candle): {:.6}",
+        similarity
+    );
 
-    assert!(similarity > 0.7,
-        "Cosine similarity should be > 0.7, got {:.6}", similarity);
+    assert!(
+        similarity > 0.7,
+        "Cosine similarity should be > 0.7, got {:.6}",
+        similarity
+    );
 }
 
 /// Test 3: Deterministic — same text should produce the same embedding
@@ -66,14 +80,22 @@ fn ab_deterministic_embedding() {
     let v1 = fast.embed_one("hello world").expect("first");
     let v2 = fast.embed_one("hello world").expect("second");
     let sim = FastembedEngine::cosine_similarity(&v1, &v2);
-    assert!((sim - 1.0).abs() < 1e-6, "FastembedEngine deterministic: {:.10}", sim);
+    assert!(
+        (sim - 1.0).abs() < 1e-6,
+        "FastembedEngine deterministic: {:.10}",
+        sim
+    );
     eprintln!("✓ FastembedEngine deterministic: {:.10}", sim);
 
     // Candle
     let v1 = candle_embed(&candle, "hello world");
     let v2 = candle_embed(&candle, "hello world");
     let sim = FastembedEngine::cosine_similarity(&v1, &v2);
-    assert!((sim - 1.0).abs() < 1e-6, "CandleNomicEmbedder deterministic: {:.10}", sim);
+    assert!(
+        (sim - 1.0).abs() < 1e-6,
+        "CandleNomicEmbedder deterministic: {:.10}",
+        sim
+    );
     eprintln!("✓ CandleNomicEmbedder deterministic: {:.10}", sim);
 }
 
@@ -89,10 +111,23 @@ fn ab_binary_quantize_384d() {
     let fast_bin = binary_quantize(&fast_vec);
     let candle_bin = binary_quantize(&candle_vec);
 
-    assert_eq!(fast_bin.len(), 48, "Fastembed binary_quantize: expected 48, got {}", fast_bin.len());
-    assert_eq!(candle_bin.len(), 48, "Candle binary_quantize: expected 48, got {}", candle_bin.len());
-    eprintln!("✓ binary_quantize: Fastembed {} bytes, Candle {} bytes",
-        fast_bin.len(), candle_bin.len());
+    assert_eq!(
+        fast_bin.len(),
+        48,
+        "Fastembed binary_quantize: expected 48, got {}",
+        fast_bin.len()
+    );
+    assert_eq!(
+        candle_bin.len(),
+        48,
+        "Candle binary_quantize: expected 48, got {}",
+        candle_bin.len()
+    );
+    eprintln!(
+        "✓ binary_quantize: Fastembed {} bytes, Candle {} bytes",
+        fast_bin.len(),
+        candle_bin.len()
+    );
 }
 
 /// Test 5: Semantic differentiation — related texts should be closer than unrelated

@@ -10,7 +10,7 @@
 
 use async_trait::async_trait;
 use candle_core::{DType, Device, Tensor};
-use candle_nn::{embedding, layer_norm, linear_no_bias, Embedding, LayerNorm, Module, VarBuilder};
+use candle_nn::{Embedding, LayerNorm, Module, VarBuilder, embedding, layer_norm, linear_no_bias};
 use hf_hub::api::sync::Api;
 use tokenizers::Tokenizer;
 use tracing::info;
@@ -46,15 +46,19 @@ fn build_rope(device: &Device) -> candle_core::Result<(Tensor, Tensor)> {
         .map(|i| (1.0 / ROPE_THETA.powf(i as f64 / HEAD_DIM as f64)) as f32)
         .collect();
     let inv_freq = Tensor::from_vec(inv_freq, (HEAD_DIM / 2,), device)?;
-    let positions = Tensor::arange(0u32, MAX_POSITIONS as u32, device)?
-        .to_dtype(DType::F32)?;
+    let positions = Tensor::arange(0u32, MAX_POSITIONS as u32, device)?.to_dtype(DType::F32)?;
     let positions = positions.reshape((MAX_POSITIONS, 1))?;
     let freqs = positions.matmul(&inv_freq.reshape((1, HEAD_DIM / 2))?)?;
     Ok((freqs.cos()?, freqs.sin()?))
 }
 
 /// Apply rotary embeddings to [b, s, nh, hd] tensor.
-fn apply_rope(xs: &Tensor, cos: &Tensor, sin: &Tensor, seq_len: usize) -> candle_core::Result<Tensor> {
+fn apply_rope(
+    xs: &Tensor,
+    cos: &Tensor,
+    sin: &Tensor,
+    seq_len: usize,
+) -> candle_core::Result<Tensor> {
     let dims = xs.dims();
     if dims.len() != 4 || seq_len == 0 {
         return Ok(xs.clone());
@@ -247,8 +251,8 @@ impl CandleNomicEmbedder {
     /// Download and load the model (CPU only).
     pub fn new() -> Result<Self, EmbedderError> {
         let device = Device::Cpu;
-        let api = Api::new()
-            .map_err(|e| EmbedderError::NotInitialized(format!("HF Hub init: {e}")))?;
+        let api =
+            Api::new().map_err(|e| EmbedderError::NotInitialized(format!("HF Hub init: {e}")))?;
         let repo = api.model("nomic-ai/nomic-embed-text-v1.5".to_string());
 
         let weights = repo
@@ -309,7 +313,10 @@ impl CandleNomicEmbedder {
             .to_dtype(DType::F32)
             .map_err(&candle_err)?;
 
-        let h = self.embeddings.forward(&ids_t, &tt_t).map_err(&candle_err)?;
+        let h = self
+            .embeddings
+            .forward(&ids_t, &tt_t)
+            .map_err(&candle_err)?;
         let h = self.encoder.forward(&h, None).map_err(&candle_err)?;
 
         // Mean pooling over non-padding tokens
