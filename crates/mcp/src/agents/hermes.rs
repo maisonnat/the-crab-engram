@@ -26,6 +26,70 @@ impl HermesAdapter {
                 .join("config.yaml"),
         )
     }
+
+    /// Set memory.provider: engram in Hermes config.yaml.
+    fn _set_memory_provider(&self, actions: &mut Vec<SetupAction>, dry_run: bool) -> Result<()> {
+        let Some(path) = self.config_path() else {
+            return Ok(());
+        };
+
+        let provider_line = "  provider: engram";
+
+        if dry_run {
+            actions.push(SetupAction {
+                action: ActionKind::Updated,
+                target: path.display().to_string(),
+                detail: "Would set memory.provider to 'engram'".into(),
+            });
+            return Ok(());
+        }
+
+        if !path.exists() {
+            actions.push(SetupAction {
+                action: ActionKind::Skipped,
+                target: path.display().to_string(),
+                detail: "Hermes config not found — skipping memory provider setup".into(),
+            });
+            return Ok(());
+        }
+
+        let raw = std::fs::read_to_string(&path)?;
+
+        // Already set to engram — skip
+        if raw.contains("memory:") && raw.contains(provider_line) {
+            actions.push(SetupAction {
+                action: ActionKind::Skipped,
+                target: path.display().to_string(),
+                detail: "memory.provider already set to 'engram'".into(),
+            });
+            return Ok(());
+        }
+
+        let has_memory_section = raw.contains("memory:");
+        let has_any_provider = raw.contains("provider:");
+
+        let new_raw = if has_memory_section && !has_any_provider {
+            // memory: exists but no provider line — insert one
+            let pos = raw.find("memory:").map(|i| i + "memory:".len()).unwrap();
+            format!("{}{}\n{}", &raw[..pos], "\n  provider: engram", &raw[pos..])
+        } else if !has_memory_section {
+            // No memory section at all — append
+            format!("{}\n\nmemory:\n  provider: engram\n", raw.trim_end())
+        } else {
+            // Replace the existing provider value under memory:
+            // Only replace the FIRST occurrence (which should be under memory:)
+            raw.replacen("  provider:", provider_line, 1)
+        };
+
+        std::fs::write(&path, &new_raw)?;
+        actions.push(SetupAction {
+            action: ActionKind::Updated,
+            target: path.display().to_string(),
+            detail: "Set memory.provider to 'engram'".into(),
+        });
+
+        Ok(())
+    }
 }
 
 impl AgentAdapter for HermesAdapter {
@@ -58,6 +122,7 @@ impl AgentAdapter for HermesAdapter {
             return Ok(SetupResult { actions });
         };
 
+        // ── Step 1: Register MCP entry ──────────────────────────────
         let mcp_block = build_mcp_entry_yaml("all");
 
         if dry_run {
@@ -69,7 +134,6 @@ impl AgentAdapter for HermesAdapter {
         } else {
             let raw = std::fs::read_to_string(&path)?;
 
-            // Check if engram MCP entry already exists
             if raw.contains("mcp_servers:") && raw.contains("engram:") {
                 actions.push(SetupAction {
                     action: ActionKind::Skipped,
@@ -77,7 +141,6 @@ impl AgentAdapter for HermesAdapter {
                     detail: "engram MCP entry already present".into(),
                 });
             } else if raw.contains("mcp_servers:") {
-                // Insert engram entry under existing mcp_servers key
                 let marker = "mcp_servers:";
                 let insert_pos = raw.find(marker).map(|i| i + marker.len()).unwrap_or(0);
                 let new_raw = format!(
@@ -93,7 +156,6 @@ impl AgentAdapter for HermesAdapter {
                     detail: "Added engram MCP entry under mcp_servers".into(),
                 });
             } else {
-                // Append mcp_servers section at the end
                 let new_raw = format!("{}\nmcp_servers:\n{}", raw, mcp_block);
                 std::fs::write(&path, &new_raw)?;
                 actions.push(SetupAction {
@@ -103,6 +165,9 @@ impl AgentAdapter for HermesAdapter {
                 });
             }
         }
+
+        // ── Step 2: Set memory.provider = engram ────────────────────
+        self._set_memory_provider(&mut actions, dry_run)?;
 
         Ok(SetupResult { actions })
     }
@@ -122,7 +187,6 @@ impl AgentAdapter for HermesAdapter {
                 });
             } else {
                 let raw = std::fs::read_to_string(&path)?;
-                // Simple removal: find and remove the engram block
                 if let Some(start) = raw.find("\n  engram:") {
                     let remaining = &raw[start..];
                     let end = remaining
