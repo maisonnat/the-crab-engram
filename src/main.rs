@@ -4,6 +4,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use engram_core::{ObservationType, Scope};
+use engram_mcp::doctor::{self, CheckResult, CheckStatus, DoctorCheck};
 use engram_mcp::{EngramConfig, EngramServer, ToolProfile};
 use engram_store::{AddObservationParams, SearchOptions, SqliteStore, Storage};
 use reqwest::blocking as reqwest_blocking;
@@ -974,21 +975,80 @@ async fn main() -> Result<()> {
                 println!("   the-crab-engram mcp --project <your-project>");
             }
         },
-        Commands::Doctor { agent, fix } => match agent {
-            Some(AgentArg::Opencode) | None => {
-                crate::opencode_setup::run_doctor(fix).await?;
+        Commands::Doctor { agent, fix } => {
+            let mut all_results = Vec::new();
+
+            // Generic checks (always run)
+            all_results.push(doctor::check_binary_in_path());
+            let server_result = tokio::task::spawn_blocking(doctor::check_server_running)
+                .await
+                .unwrap_or_else(|_| CheckResult {
+                    name: DoctorCheck::ServerRunning.name().to_string(),
+                    status: CheckStatus::Fail,
+                    message: "Health check task panicked".to_string(),
+                    fix_command: Some("the-crab-engram serve --port 7437".to_string()),
+                });
+            all_results.push(server_result);
+
+            // Agent-specific checks
+            let adapters: Vec<Box<dyn engram_mcp::agents::AgentAdapter>> = match agent {
+                Some(AgentArg::Opencode) => {
+                    vec![Box::new(engram_mcp::agents::opencode::OpenCodeAdapter::new())]
+                }
+                Some(AgentArg::ClaudeCode) => {
+                    vec![Box::new(engram_mcp::agents::claude_code::ClaudeCodeAdapter::new())]
+                }
+                Some(AgentArg::Cursor) => {
+                    vec![Box::new(engram_mcp::agents::cursor::CursorAdapter::new())]
+                }
+                Some(AgentArg::GeminiCli) => {
+                    // Gemini CLI doesn't support MCP natively — warn and skip
+                    all_results.push(CheckResult {
+                        name: "Gemini CLI".to_string(),
+                        status: CheckStatus::Warn,
+                        message: "Gemini CLI does not support MCP server registration".to_string(),
+                        fix_command: None,
+                    });
+                    Vec::new()
+                }
+                None => {
+                    // No agent specified — run for all detected
+                    engram_mcp::agents::detect_installed()
+                }
+            };
+
+            for adapter in &adapters {
+                all_results.push(CheckResult {
+                    name: format!("── {} ──", adapter.name()),
+                    status: CheckStatus::Pass,
+                    message: String::new(),
+                    fix_command: None,
+                });
+                all_results.extend(adapter.doctor());
             }
-            Some(other) => {
-                let name = match other {
-                    AgentArg::ClaudeCode => "claude-code",
-                    AgentArg::Cursor => "cursor",
-                    AgentArg::GeminiCli => "gemini-cli",
-                    AgentArg::Opencode => "opencode",
-                };
-                eprintln!("Doctor command not yet supported for {name}");
-                std::process::exit(1);
+
+            // DB check
+            let db_result = crate::opencode_setup::check_database();
+            all_results.push(db_result);
+
+            doctor::display_results(&all_results);
+            // Note: auto-fix currently only available for OpenCode
+            if fix {
+                if let Some(AgentArg::Opencode) = agent {
+                    if let Ok(paths) = engram_mcp::opencode_paths::OpenCodePaths::detect() {
+                        crate::opencode_setup::run_opencode_fix(&paths).await?;
+                    }
+                } else {
+                    eprintln!("Auto-fix currently only supported for OpenCode. Use 'the-crab-engram install {}' to install.", 
+                        agent.map(|a| match a {
+                            AgentArg::ClaudeCode => "claude-code",
+                            AgentArg::Cursor => "cursor",
+                            AgentArg::GeminiCli => "gemini-cli",
+                            AgentArg::Opencode => "opencode",
+                        }).unwrap_or("<agent>"));
+                }
             }
-        },
+        }
         Commands::Self_ { action } => match action {
             SelfAction::Update {
                 check_only,

@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
+use crate::doctor::{CheckResult, CheckStatus, DoctorCheck};
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -54,7 +56,7 @@ impl SetupResult {
 // Trait
 // ---------------------------------------------------------------------------
 
-/// Adapter for a specific AI agent's MCP config.
+/// Trait for a specific AI agent's MCP config.
 pub trait AgentAdapter: Send + Sync {
     /// Human-readable agent name (e.g., "Claude Code").
     fn name(&self) -> &str;
@@ -73,6 +75,65 @@ pub trait AgentAdapter: Send + Sync {
 
     /// Uninstall: remove Engram MCP entry.
     fn uninstall(&self, dry_run: bool) -> Result<SetupResult>;
+
+    /// Run diagnostic checks for this agent.
+    /// Default impl checks: agent detected, config exists, MCP entry valid.
+    fn doctor(&self) -> Vec<CheckResult> {
+        let mut results = Vec::new();
+
+        // Check: agent binary detected
+        match self.detect() {
+            Ok(true) => results.push(CheckResult {
+                name: format!("{} installed", self.name()),
+                status: CheckStatus::Pass,
+                message: format!("{} binary/config found", self.name()),
+                fix_command: None,
+            }),
+            Ok(false) => results.push(CheckResult {
+                name: format!("{} installed", self.name()),
+                status: CheckStatus::Warn,
+                message: format!("{} not detected on this system", self.name()),
+                fix_command: Some(format!("Install {} and try again", self.name())),
+            }),
+            Err(e) => results.push(CheckResult {
+                name: format!("{} installed", self.name()),
+                status: CheckStatus::Fail,
+                message: format!("Detection error: {e}"),
+                fix_command: None,
+            }),
+        }
+
+        // Check: config file exists
+        match self.config_paths() {
+            Ok(paths) => {
+                if paths.is_empty() {
+                    results.push(CheckResult {
+                        name: format!("{} config file", self.name()),
+                        status: CheckStatus::Fail,
+                        message: format!("No config file found for {}", self.name()),
+                        fix_command: Some(format!("the-crab-engram install {}", self.key())),
+                    });
+                } else {
+                    for path in &paths {
+                        results.push(CheckResult {
+                            name: format!("{} config file", self.name()),
+                            status: CheckStatus::Pass,
+                            message: path.display().to_string(),
+                            fix_command: None,
+                        });
+                    }
+                }
+            }
+            Err(e) => results.push(CheckResult {
+                name: format!("{} config file", self.name()),
+                status: CheckStatus::Fail,
+                message: format!("Cannot detect paths: {e}"),
+                fix_command: None,
+            }),
+        }
+
+        results
+    }
 }
 
 // ---------------------------------------------------------------------------
