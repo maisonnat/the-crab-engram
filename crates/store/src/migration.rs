@@ -83,9 +83,6 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> crate::Result<()> {
     )
     .map_err(|e| EngramError::Database(e.to_string()))?;
 
-    // Fix schema compatibility: Go engram DB may be missing columns added in Rust
-    fix_schema_compat(conn)?;
-
     for migration in MIGRATIONS {
         // Check if already applied
         let exists: bool = conn
@@ -113,6 +110,11 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> crate::Result<()> {
 
         info!("Migration {:03} applied", migration.version);
     }
+
+    // Fix schema compatibility AFTER all migrations have run.
+    // This handles Go engram DBs that may be missing columns the Rust version expects,
+    // without conflicting with numbered migrations that add the same columns.
+    fix_schema_compat(conn)?;
 
     Ok(())
 }
