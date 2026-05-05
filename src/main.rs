@@ -12,7 +12,6 @@ use self_update::backends::github::{ReleaseList, Update};
 use sha2::{Digest, Sha256};
 
 use crate::learn_daemon::{LearnDaemon, LearnDaemonConfig, format_tick_summary};
-use engram_api::LearnTickStatus;
 
 mod learn_daemon;
 mod opencode_setup;
@@ -161,17 +160,11 @@ enum Commands {
     },
     /// Version info
     Version,
-    /// Start HTTP REST API server
+    /// Start HTTP REST API server (learn daemon runs separately via systemd timer)
     Serve {
         /// Port to listen on
         #[arg(long, default_value = "7437")]
         port: u16,
-        /// Run the autonomous learn daemon alongside the API server
-        #[arg(long)]
-        learn_daemon: bool,
-        /// Learn daemon interval in seconds
-        #[arg(long, default_value = "60")]
-        learn_interval: u64,
     },
     /// Launch interactive Terminal UI
     Tui,
@@ -654,72 +647,11 @@ async fn main() -> Result<()> {
             eprintln!("update: run `the-crab-engram self update` to check for updates");
         }
 
-        Commands::Serve {
-            port,
-            learn_daemon,
-            learn_interval,
-        } => {
+        Commands::Serve { port } => {
             let store = Arc::new(open_store(cli.db)?);
-            let learn_status = Arc::new(std::sync::Mutex::new(if learn_daemon {
-                engram_api::LearnDaemonStatus::enabled(cli.project.clone(), learn_interval)
-            } else {
-                engram_api::LearnDaemonStatus::disabled(cli.project.clone())
-            }));
-
-            if learn_daemon {
-                let daemon_store: Arc<dyn Storage> = store.clone();
-                let config = LearnDaemonConfig {
-                    project: cli.project.clone(),
-                    interval_seconds: learn_interval,
-                    ..Default::default()
-                };
-                let daemon_status = learn_status.clone();
-                std::thread::spawn(move || {
-                    let daemon = LearnDaemon::new(daemon_store, config, None, Some(daemon_status));
-                    if let Err(err) = daemon.run_loop() {
-                        tracing::error!(?err, "learn daemon stopped");
-                    }
-                });
-            }
-
-            let learn_tick_fn = if learn_daemon {
-                let tick_store: Arc<dyn Storage> = store.clone();
-                let tick_config = LearnDaemonConfig {
-                    project: cli.project.clone(),
-                    interval_seconds: learn_interval,
-                    ..Default::default()
-                };
-                let tick_status = learn_status.clone();
-                Some(Arc::new(move || {
-                    let daemon = LearnDaemon::new(
-                        tick_store.clone(),
-                        tick_config.clone(),
-                        None,
-                        Some(tick_status.clone()),
-                    );
-                    daemon
-                        .run_once()
-                        .map(|r| LearnTickStatus {
-                            entities_linked: r.entities_linked,
-                            capsules_upserted: r.capsules_upserted,
-                            reviews_upserted: r.reviews_upserted,
-                            anti_patterns_found: r.anti_patterns_found,
-                            snapshots_written: r.snapshots_written,
-                        })
-                        .map_err(|e| e.to_string())
-                })
-                    as Arc<
-                        dyn Fn() -> Result<LearnTickStatus, String> + Send + Sync,
-                    >)
-            } else {
-                None
-            };
-
             let state = engram_api::AppState {
                 store,
                 project: cli.project.clone(),
-                learn_status: Some(learn_status),
-                learn_tick_fn,
             };
             let app = engram_api::create_router(state);
             let addr = format!("0.0.0.0:{port}");
@@ -727,9 +659,7 @@ async fn main() -> Result<()> {
                 "The Crab Engram v{} — HTTP API on {addr}",
                 env!("CARGO_PKG_VERSION")
             );
-            if learn_daemon {
-                eprintln!("Learn daemon enabled — interval: {}s", learn_interval);
-            }
+            eprintln!("Learn daemon: run via systemd timer (the-crab-engram learn --once)");
             let listener = tokio::net::TcpListener::bind(&addr).await?;
             axum::serve(listener, app).await?;
         }

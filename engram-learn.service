@@ -1,0 +1,10 @@
+[Unit]
+Description=The Crab Engram — Learn Tick (oneshot)
+Documentation=https://github.com/maisonnat/the-crab-engram
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/maiso/.local/bin/the-crab-engram --db /home/maiso/.engram/engram.db learn --once
+User=maiso
+Group=maiso

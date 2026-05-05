@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use axum::{
     Json, Router,
@@ -12,8 +12,8 @@ use tower_http::cors::CorsLayer;
 
 use engram_core::{ObservationType, RelationType, Scope};
 use engram_learn::{
-    AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, HeuristicSynthesizer, MemoryStream,
-    SmartInjector,
+    AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, GraphEvolver, HeuristicSynthesizer,
+    MemoryStream, SmartInjector, infer_salience,
 };
 use engram_store::{
     AddEdgeParams, AddObservationParams, SearchOptions, Storage, UpdateObservationParams,
@@ -73,8 +73,6 @@ impl LearnDaemonStatus {
 pub struct AppState {
     pub store: Arc<dyn Storage>,
     pub project: String,
-    pub learn_status: Option<Arc<Mutex<LearnDaemonStatus>>>,
-    pub learn_tick_fn: Option<Arc<dyn Fn() -> Result<LearnTickStatus, String> + Send + Sync>>,
 }
 
 /// Create the API router.
@@ -183,32 +181,133 @@ async fn health() -> impl IntoResponse {
 }
 
 async fn learn_status(State(state): State<AppState>) -> impl IntoResponse {
-    let status = match &state.learn_status {
-        Some(status) => status
-            .lock()
-            .map(|s| s.clone())
-            .unwrap_or_else(|_| LearnDaemonStatus::disabled(state.project.clone())),
-        None => LearnDaemonStatus::disabled(state.project.clone()),
-    };
-
-    Json(status)
+    Json(LearnDaemonStatus::disabled(state.project.clone()))
 }
 
-/// POST /learn/run — Trigger a manual learn tick.
+/// POST /learn/run — Trigger a manual learn tick (runs core pipeline inline).
 async fn learn_run(State(state): State<AppState>) -> impl IntoResponse {
-    let Some(tick_fn) = &state.learn_tick_fn else {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "learn daemon not enabled"})),
-        )
-            .into_response();
-    };
+    let store = state.store.clone();
+    let project = state.project.clone();
 
-    match tick_fn() {
-        Ok(tick) => (StatusCode::OK, Json(tick)).into_response(),
-        Err(err) => (
+    let result = tokio::task::spawn_blocking(move || -> Result<LearnTickStatus, String> {
+        // 1. Ensure a session exists
+        let session_id = store
+            .clone()
+            .create_session(&project)
+            .map_err(|e| e.to_string())?;
+
+        // 2. Fetch recent observations
+        let observations = store
+            .search(&SearchOptions {
+                query: String::new(),
+                project: Some(project.clone()),
+                limit: Some(1000),
+                ..Default::default()
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut entities_linked = 0usize;
+
+        // 3. Observe phase — link entities
+        for obs in &observations {
+            let text = format!("{} {}", obs.title, obs.content);
+            let entities = MemoryStream::extract_entities(&text);
+            let _salience = infer_salience(&obs.content, None);
+
+            for entity in entities {
+                let entity_id = match store.get_entity(&entity.name).map_err(|e| e.to_string())? {
+                    Some((id, _, _, _)) => id,
+                    None => store
+                        .upsert_entity(&entity.name, &entity.entity_type, "")
+                        .map_err(|e| e.to_string())?,
+                };
+                store
+                    .link_entity_observation(entity_id, obs.id)
+                    .map_err(|e| e.to_string())?;
+                entities_linked += 1;
+            }
+        }
+
+        // 4. Consolidation
+        let consolidator = ConsolidationEngine::new(store.clone(), None);
+        let _consolidation = consolidator
+            .run_consolidation(&project)
+            .map_err(|e| e.to_string())?;
+
+        // 5. Evolution
+        let evolver = GraphEvolver::new(store.clone(), None);
+        let _evolution = evolver.evolve(&project).map_err(|e| e.to_string())?;
+
+        // 6. Capsules
+        let mut capsules_upserted = 0usize;
+        let mut topic_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        for obs in &observations {
+            if let Some(topic) = obs.topic_key.as_ref().filter(|s| !s.is_empty()) {
+                *topic_counts.entry(topic.clone()).or_insert(0) += 1;
+            }
+        }
+        let mut topics: Vec<(String, usize)> = topic_counts.into_iter().collect();
+        topics.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+        let builder = CapsuleBuilder::new(store.clone(), Box::new(HeuristicSynthesizer));
+
+        for (topic, _count) in topics.into_iter().filter(|(_, c)| *c >= 2).take(5) {
+            if let Ok(capsule) = builder.build_capsule(&project, &topic) {
+                store.upsert_capsule(&capsule).map_err(|e| e.to_string())?;
+                capsules_upserted += 1;
+            }
+        }
+
+        // 7. Anti-patterns
+        let detector = AntiPatternDetector::new(store.clone(), None);
+        let patterns = detector.detect_all(&project).map_err(|e| e.to_string())?;
+
+        for pattern in &patterns {
+            let topic = format!(
+                "learn/anti-pattern/{}",
+                pattern.r#type.to_string().to_lowercase().replace(' ', "-")
+            );
+            let content = format!(
+                "{}\n\nSeverity: {}\nSuggestion: {}\nEvidence: {:?}",
+                pattern.description, pattern.severity, pattern.suggestion, pattern.evidence
+            );
+            let _ = store.insert_observation(&AddObservationParams {
+                r#type: ObservationType::Learning,
+                scope: Scope::Project,
+                title: format!("Anti-pattern detected: {}", pattern.r#type),
+                content,
+                session_id: session_id.clone(),
+                project: project.clone(),
+                topic_key: Some(topic),
+                provenance_source: Some("inferred".into()),
+                provenance_evidence: pattern
+                    .evidence
+                    .iter()
+                    .map(|id| format!("observation:{id}"))
+                    .collect(),
+            });
+        }
+
+        Ok(LearnTickStatus {
+            entities_linked,
+            capsules_upserted,
+            reviews_upserted: 0,
+            anti_patterns_found: patterns.len(),
+            snapshots_written: 0,
+        })
+    })
+    .await;
+
+    match result {
+        Ok(Ok(tick)) => (StatusCode::OK, Json(tick)).into_response(),
+        Ok(Err(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": err})),
+        )
+            .into_response(),
+        Err(join_err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("task panicked: {join_err}")})),
         )
             .into_response(),
     }
