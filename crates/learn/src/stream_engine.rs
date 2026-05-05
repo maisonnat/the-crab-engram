@@ -2,17 +2,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use engram_core::{EngramError, ExtractedEntity, MemoryEvent, Observation};
-use engram_search::Embedder;
+use engram_search::FastembedEngine;
 use engram_store::{SearchOptions, Storage};
 
 /// Memory stream that detects events from tool calls and observations.
 pub struct MemoryStream {
     pub store: Arc<dyn Storage>,
-    pub embedder: Option<Arc<Embedder>>,
+    pub embedder: Option<Arc<FastembedEngine>>,
 }
 
 impl MemoryStream {
-    pub fn new(store: Arc<dyn Storage>, embedder: Option<Arc<Embedder>>) -> Self {
+    pub fn new(store: Arc<dyn Storage>, embedder: Option<Arc<FastembedEngine>>) -> Self {
         Self { store, embedder }
     }
 
@@ -81,7 +81,7 @@ impl MemoryStream {
         let mut events = Vec::new();
 
         for (obs, emb) in observations.iter().zip(embeddings.iter()) {
-            let similarity = Embedder::cosine_similarity(&task_embedding, emb);
+            let similarity = FastembedEngine::cosine_similarity(&task_embedding, emb);
             if similarity > 0.85 && similarity < 0.99 {
                 events.push(MemoryEvent::DejaVu {
                     current_task: task_description.to_string(),

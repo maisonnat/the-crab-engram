@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use engram_core::{EngramError, RelationType};
-use engram_search::Embedder;
+use engram_search::FastembedEngine;
 use engram_store::{AddEdgeParams, SearchOptions, Storage};
 
 /// A new edge detected by the graph evolver.
@@ -42,11 +42,11 @@ impl std::fmt::Display for EvolutionResult {
 /// Auto-detects relationships between observations and evolves the knowledge graph.
 pub struct GraphEvolver {
     pub store: Arc<dyn Storage>,
-    pub embedder: Option<Arc<Embedder>>,
+    pub embedder: Option<Arc<FastembedEngine>>,
 }
 
 impl GraphEvolver {
-    pub fn new(store: Arc<dyn Storage>, embedder: Option<Arc<Embedder>>) -> Self {
+    pub fn new(store: Arc<dyn Storage>, embedder: Option<Arc<FastembedEngine>>) -> Self {
         Self { store, embedder }
     }
 
@@ -199,7 +199,7 @@ impl GraphEvolver {
 
         for i in 0..observations.len() {
             for j in (i + 1)..observations.len() {
-                let sim = Embedder::cosine_similarity(&embeddings[i], &embeddings[j]);
+                let sim = FastembedEngine::cosine_similarity(&embeddings[i], &embeddings[j]);
 
                 if sim > 0.85 && sim < 0.99 {
                     // Similar but not duplicate (0.99+ would be duplicate)

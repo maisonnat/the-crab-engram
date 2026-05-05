@@ -12,7 +12,7 @@ use engram_learn::{
     AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, ConsolidationResult, EvolutionResult,
     GraphEvolver, HeuristicSynthesizer, SmartInjector, infer_salience,
 };
-use engram_search::Embedder;
+use engram_search::FastembedEngine;
 use engram_store::{AddObservationParams, SearchOptions, Storage};
 
 #[derive(Debug, Clone)]
@@ -66,7 +66,7 @@ pub struct LearnTickResult {
 pub struct LearnDaemon {
     store: Arc<dyn Storage>,
     config: LearnDaemonConfig,
-    embedder: Option<Arc<Embedder>>,
+    embedder: Option<Arc<FastembedEngine>>,
     status: Option<Arc<Mutex<LearnDaemonStatus>>>,
 }
 
@@ -74,7 +74,7 @@ impl LearnDaemon {
     pub fn new(
         store: Arc<dyn Storage>,
         config: LearnDaemonConfig,
-        embedder: Option<Arc<Embedder>>,
+        embedder: Option<Arc<FastembedEngine>>,
         status: Option<Arc<Mutex<LearnDaemonStatus>>>,
     ) -> Self {
         Self {

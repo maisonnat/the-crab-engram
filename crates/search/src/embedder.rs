@@ -1,9 +1,11 @@
 use std::sync::Mutex;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use engram_core::Attachment;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use thiserror::Error;
 use tracing::{info, warn};
 
 /// Metadata about the embedding model used.
@@ -37,6 +39,26 @@ pub struct HydratedEmbedding {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Errors that can occur during embedding generation.
+#[derive(Debug, Error)]
+pub enum EmbedderError {
+    #[error("Embedding generation failed: {0}")]
+    Generation(String),
+    #[error("Model not initialized: {0}")]
+    NotInitialized(String),
+}
+
+/// Trait for generating text embeddings.
+#[async_trait]
+pub trait Embedder: Send + Sync {
+    /// Generate an embedding vector for the given text.
+    async fn generate_embedding(&self, text: &str) -> Result<Vec<f32>, EmbedderError>;
+    /// The dimensionality of the embedding vectors produced.
+    fn target_dimensions(&self) -> usize;
+    /// Human-readable model name.
+    fn model_name(&self) -> &str;
+}
+
 /// Compute confidence based on text length.
 ///
 /// Longer texts produce more reliable embeddings:
@@ -55,25 +77,25 @@ pub fn confidence_from_text_length(text_len: usize) -> f64 {
     }
 }
 
-/// Local embedder using fastembed (all-MiniLM-L6-v2, 384d).
+/// Local embedding engine using fastembed (all-MiniLM-L6-v2, 384d).
 ///
 /// Features:
 /// - Model versioning (detect drift when model changes)
 /// - spawn_blocking for CPU-bound work
 /// - Fallback warning when mix of models detected
-pub struct Embedder {
+pub struct FastembedEngine {
     model: Mutex<TextEmbedding>,
     meta: EmbeddingMeta,
 }
 
-impl Embedder {
-    /// Create a new embedder. Downloads model on first use (~80MB).
+impl FastembedEngine {
+    /// Create a new engine. Downloads model on first use (~80MB).
     pub fn new() -> Result<Self> {
         let model = TextEmbedding::try_new(
             InitOptions::new(EmbeddingModel::AllMiniLML6V2).with_show_download_progress(true),
         )?;
 
-        info!("Embedder initialized: all-MiniLM-L6-v2 (384d)");
+        info!("FastembedEngine initialized: all-MiniLM-L6-v2 (384d)");
 
         Ok(Self {
             model: Mutex::new(model),
@@ -100,7 +122,7 @@ impl Embedder {
         Ok(embeddings)
     }
 
-    /// Hyrate embeddings for an observation with its attachments.
+    /// Hydrate embeddings for an observation with its attachments.
     ///
     /// Produces embeddings for both the observation text and each attachment's
     /// `embeddable_text()`. Confidence is calculated from text length — longer
@@ -174,9 +196,25 @@ impl Embedder {
     }
 }
 
-impl std::fmt::Debug for Embedder {
+#[async_trait]
+impl Embedder for FastembedEngine {
+    async fn generate_embedding(&self, text: &str) -> Result<Vec<f32>, EmbedderError> {
+        self.embed_one(text)
+            .map_err(|e| EmbedderError::Generation(e.to_string()))
+    }
+
+    fn target_dimensions(&self) -> usize {
+        self.meta.dimensions
+    }
+
+    fn model_name(&self) -> &str {
+        &self.meta.model_name
+    }
+}
+
+impl std::fmt::Debug for FastembedEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Embedder")
+        f.debug_struct("FastembedEngine")
             .field("meta", &self.meta)
             .finish()
     }
@@ -238,7 +276,7 @@ mod tests {
     fn cosine_similarity_identical() {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![1.0, 0.0, 0.0];
-        let sim = Embedder::cosine_similarity(&a, &b);
+        let sim = FastembedEngine::cosine_similarity(&a, &b);
         assert!((sim - 1.0).abs() < 1e-6);
     }
 
@@ -246,7 +284,7 @@ mod tests {
     fn cosine_similarity_orthogonal() {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![0.0, 1.0, 0.0];
-        let sim = Embedder::cosine_similarity(&a, &b);
+        let sim = FastembedEngine::cosine_similarity(&a, &b);
         assert!(sim.abs() < 1e-6);
     }
 
@@ -254,7 +292,7 @@ mod tests {
     fn cosine_similarity_opposite() {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![-1.0, 0.0, 0.0];
-        let sim = Embedder::cosine_similarity(&a, &b);
+        let sim = FastembedEngine::cosine_similarity(&a, &b);
         assert!((sim - (-1.0)).abs() < 1e-6);
     }
 
@@ -262,7 +300,7 @@ mod tests {
     fn cosine_similarity_empty() {
         let a: Vec<f32> = vec![];
         let b: Vec<f32> = vec![];
-        let sim = Embedder::cosine_similarity(&a, &b);
+        let sim = FastembedEngine::cosine_similarity(&a, &b);
         assert_eq!(sim, 0.0);
     }
 
@@ -279,7 +317,7 @@ mod tests {
     #[test]
     #[ignore]
     fn embed_one_produces_384d_vector() {
-        let embedder = Embedder::new().unwrap();
+        let embedder = FastembedEngine::new().unwrap();
         let vec = embedder.embed_one("hello world").unwrap();
         assert_eq!(vec.len(), 384);
     }
@@ -287,15 +325,15 @@ mod tests {
     #[test]
     #[ignore]
     fn semantic_similarity() {
-        let embedder = Embedder::new().unwrap();
+        let embedder = FastembedEngine::new().unwrap();
         let v1 = embedder.embed_one("N+1 query performance issue").unwrap();
         let v2 = embedder
             .embed_one("database performance optimization")
             .unwrap();
         let v3 = embedder.embed_one("the weather is nice today").unwrap();
 
-        let sim_related = Embedder::cosine_similarity(&v1, &v2);
-        let sim_unrelated = Embedder::cosine_similarity(&v1, &v3);
+        let sim_related = FastembedEngine::cosine_similarity(&v1, &v2);
+        let sim_unrelated = FastembedEngine::cosine_similarity(&v1, &v3);
 
         assert!(
             sim_related > sim_unrelated,
@@ -306,7 +344,7 @@ mod tests {
     #[test]
     #[ignore]
     fn hydrate_embeddings_with_attachments() {
-        let embedder = Embedder::new().unwrap();
+        let embedder = FastembedEngine::new().unwrap();
         let attachments = vec![
             Attachment::CodeDiff {
                 file_path: "src/auth.rs".into(),

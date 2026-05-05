@@ -4,7 +4,7 @@ use chrono::Utc;
 use tracing::{info, instrument};
 
 use engram_core::{EngramError, Observation, ObservationType, Scope};
-use engram_search::Embedder;
+use engram_search::FastembedEngine;
 use engram_store::{AddObservationParams, SearchOptions, Storage};
 
 /// Result of a consolidation run.
@@ -34,11 +34,11 @@ impl std::fmt::Display for ConsolidationResult {
 /// Engine that consolidates, cleans, and improves the knowledge base.
 pub struct ConsolidationEngine {
     pub store: Arc<dyn Storage>,
-    pub embedder: Option<Arc<Embedder>>,
+    pub embedder: Option<Arc<FastembedEngine>>,
 }
 
 impl ConsolidationEngine {
-    pub fn new(store: Arc<dyn Storage>, embedder: Option<Arc<Embedder>>) -> Self {
+    pub fn new(store: Arc<dyn Storage>, embedder: Option<Arc<FastembedEngine>>) -> Self {
         Self { store, embedder }
     }
 
@@ -123,7 +123,7 @@ impl ConsolidationEngine {
     fn merge_semantic_duplicates(
         &self,
         observations: &[Observation],
-        embedder: &Embedder,
+        embedder: &FastembedEngine,
     ) -> Result<u32, EngramError> {
         let mut merged = 0u32;
         let mut skip_ids = std::collections::HashSet::new();
@@ -144,7 +144,7 @@ impl ConsolidationEngine {
                     continue;
                 }
 
-                let similarity = Embedder::cosine_similarity(&embeddings[i], &embeddings[j]);
+                let similarity = FastembedEngine::cosine_similarity(&embeddings[i], &embeddings[j]);
 
                 if similarity > 0.92 {
                     // Merge: keep the one with higher access_count
@@ -301,7 +301,7 @@ impl ConsolidationEngine {
                     continue;
                 }
 
-                let similarity = Embedder::cosine_similarity(&embeddings[i], &embeddings[j]);
+                let similarity = FastembedEngine::cosine_similarity(&embeddings[i], &embeddings[j]);
 
                 if similarity > 0.8 {
                     cluster.push(j);

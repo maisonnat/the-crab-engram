@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use engram_core::{EngramError, ObservationType, RelationType};
-use engram_search::Embedder;
+use engram_search::FastembedEngine;
 use engram_store::{SearchOptions, Storage};
 
 /// Anti-pattern severity levels.
@@ -71,13 +71,13 @@ impl std::fmt::Display for AntiPattern {
 /// Detects anti-patterns in the knowledge base.
 pub struct AntiPatternDetector {
     pub store: std::sync::Arc<dyn Storage>,
-    pub embedder: Option<std::sync::Arc<Embedder>>,
+    pub embedder: Option<std::sync::Arc<FastembedEngine>>,
 }
 
 impl AntiPatternDetector {
     pub fn new(
         store: std::sync::Arc<dyn Storage>,
-        embedder: Option<std::sync::Arc<Embedder>>,
+        embedder: Option<std::sync::Arc<FastembedEngine>>,
     ) -> Self {
         Self { store, embedder }
     }
@@ -140,7 +140,7 @@ impl AntiPatternDetector {
                 if used.contains(&bugfixes[j].id) {
                     continue;
                 }
-                let sim = Embedder::cosine_similarity(&embeddings[i], &embeddings[j]);
+                let sim = FastembedEngine::cosine_similarity(&embeddings[i], &embeddings[j]);
                 if sim > similarity_threshold {
                     cluster.push(j);
                 }
