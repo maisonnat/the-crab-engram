@@ -207,6 +207,18 @@ enum Commands {
         #[arg(long)]
         passphrase: String,
     },
+    /// Register Engram MCP server with AI agent(s)
+    Install {
+        /// Agent to install for (omit to auto-detect installed agents)
+        #[arg(value_enum)]
+        agent: Option<AgentArg>,
+        /// Install for all known agents
+        #[arg(long)]
+        all: bool,
+        /// Show what would be done without writing
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Setup The Crab Engram for a specific AI agent
     Setup {
         /// Agent to configure
@@ -830,6 +842,46 @@ async fn main() -> Result<()> {
                     println!("  - {} observations", result.observations_imported);
                     println!("  - {} sessions", result.sessions_imported);
                     println!("  - {} duplicates skipped", result.duplicates_skipped);
+                }
+            }
+        }
+
+        Commands::Install {
+            agent,
+            all,
+            dry_run,
+        } => {
+            let adapters: Vec<Box<dyn engram_mcp::agents::AgentAdapter>> = if all {
+                engram_mcp::agents::all_adapters()
+            } else if let Some(a) = agent {
+                let key = match a {
+                    AgentArg::ClaudeCode => "claude-code",
+                    AgentArg::Cursor => "cursor",
+                    AgentArg::GeminiCli => "gemini-cli",
+                    AgentArg::Opencode => "opencode",
+                };
+                match engram_mcp::agents::detect_agent(key) {
+                    Some(adapter) => vec![adapter],
+                    None => {
+                        eprintln!("Unknown agent: {key}");
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                engram_mcp::agents::detect_installed()
+            };
+
+            if adapters.is_empty() {
+                eprintln!("No supported AI agents detected.");
+                eprintln!("Try: 'the-crab-engram install --all' or specify an agent name.");
+                std::process::exit(0);
+            }
+
+            for adapter in &adapters {
+                println!("\n── {} ──", adapter.name());
+                match adapter.install(dry_run) {
+                    Ok(result) => result.display_table(),
+                    Err(e) => eprintln!("Error: {e}"),
                 }
             }
         }

@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod config_merge;
 pub mod doctor;
 pub mod opencode_paths;
