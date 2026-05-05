@@ -90,11 +90,12 @@ struct NomicBertEmbeddings {
 }
 
 impl NomicBertEmbeddings {
-    fn load(vb: VarBuilder) -> candle_core::Result<Self> {
+    fn load(vb: VarBuilder, root_vb: &VarBuilder) -> candle_core::Result<Self> {
         Ok(Self {
             word_embeddings: embedding(VOCAB_SIZE, HIDDEN_SIZE, vb.pp("word_embeddings"))?,
             token_type_embeddings: embedding(2, HIDDEN_SIZE, vb.pp("token_type_embeddings"))?,
-            ln: layer_norm(HIDDEN_SIZE, LAYER_NORM_EPS, vb.pp("emb_ln"))?,
+            // emb_ln is at root level (not under embeddings.* prefix) in the safetensors file
+            ln: layer_norm(HIDDEN_SIZE, LAYER_NORM_EPS, root_vb.pp("emb_ln"))?,
         })
     }
 
@@ -114,9 +115,9 @@ struct NomicBertGatedMLP {
 impl NomicBertGatedMLP {
     fn load(vb: VarBuilder) -> candle_core::Result<Self> {
         Ok(Self {
-            fc11: linear_no_bias(INTERMEDIATE_SIZE, HIDDEN_SIZE, vb.pp("fc11"))?,
-            fc12: linear_no_bias(INTERMEDIATE_SIZE, HIDDEN_SIZE, vb.pp("fc12"))?,
-            fc2: linear_no_bias(HIDDEN_SIZE, INTERMEDIATE_SIZE, vb.pp("fc2"))?,
+            fc11: linear_no_bias(HIDDEN_SIZE, INTERMEDIATE_SIZE, vb.pp("fc11"))?,
+            fc12: linear_no_bias(HIDDEN_SIZE, INTERMEDIATE_SIZE, vb.pp("fc12"))?,
+            fc2: linear_no_bias(INTERMEDIATE_SIZE, HIDDEN_SIZE, vb.pp("fc2"))?,
         })
     }
 
@@ -138,7 +139,7 @@ struct NomicBertAttention {
 impl NomicBertAttention {
     fn load(vb: VarBuilder, cos: Tensor, sin: Tensor) -> candle_core::Result<Self> {
         Ok(Self {
-            wqkv: linear_no_bias(NUM_HEADS * HEAD_DIM * 3, HIDDEN_SIZE, vb.pp("Wqkv"))?,
+            wqkv: linear_no_bias(HIDDEN_SIZE, NUM_HEADS * HEAD_DIM * 3, vb.pp("Wqkv"))?,
             out_proj: linear_no_bias(HIDDEN_SIZE, HIDDEN_SIZE, vb.pp("out_proj"))?,
             cos,
             sin,
@@ -164,7 +165,7 @@ impl NomicBertAttention {
         let k = k.permute((0, 2, 1, 3))?;
         let v = v.permute((0, 2, 1, 3))?;
 
-        let scale = Tensor::new(1.0 / (HEAD_DIM as f64).sqrt(), x.device())?;
+        let scale = Tensor::new(1.0f32 / (HEAD_DIM as f32).sqrt(), x.device())?;
         let attn = q.matmul(&k.transpose(2, 3)?)?;
         let attn = attn.broadcast_mul(&scale)?;
 
@@ -275,7 +276,7 @@ impl CandleNomicEmbedder {
         let (cos, sin) =
             build_rope(&device).map_err(|e| EmbedderError::NotInitialized(format!("RoPE: {e}")))?;
 
-        let embeddings = NomicBertEmbeddings::load(vb.pp("embeddings"))
+        let embeddings = NomicBertEmbeddings::load(vb.pp("embeddings"), &vb)
             .map_err(|e| EmbedderError::NotInitialized(format!("embeddings: {e}")))?;
         let encoder = NomicBertEncoder::load(vb.pp("encoder"), cos, sin)
             .map_err(|e| EmbedderError::NotInitialized(format!("encoder: {e}")))?;
@@ -321,7 +322,7 @@ impl CandleNomicEmbedder {
 
         // Mean pooling over non-padding tokens
         let mask_3d = mask_t.reshape((1, seq_len, 1)).map_err(&candle_err)?;
-        let summed = (h * &mask_3d)
+        let summed = (h.broadcast_mul(&mask_3d))
             .map_err(&candle_err)?
             .sum(1)
             .map_err(&candle_err)?;
@@ -331,6 +332,7 @@ impl CandleNomicEmbedder {
             .reshape((1, 1))
             .map_err(&candle_err)?;
         let one = Tensor::new(1f32, &self.device).map_err(&candle_err)?;
+        let one = one.reshape((1, 1)).map_err(&candle_err)?;
         let count = count.maximum(&one).map_err(&candle_err)?;
         let pooled = summed.broadcast_div(&count).map_err(&candle_err)?;
 
@@ -343,12 +345,17 @@ impl CandleNomicEmbedder {
             .sqrt()
             .map_err(&candle_err)?;
         let eps = Tensor::new(1e-12f32, &self.device).map_err(&candle_err)?;
+        let eps = eps.reshape((1,)).map_err(&candle_err)?;
         let pooled = pooled
             .broadcast_div(&norm.maximum(&eps).map_err(&candle_err)?)
             .map_err(&candle_err)?;
 
         // Matryoshka: slice to EMBED_DIM (384)
-        let embedding = pooled.narrow(1, 0, EMBED_DIM).map_err(&candle_err)?;
+        let embedding = pooled
+            .narrow(1, 0, EMBED_DIM)
+            .map_err(&candle_err)?
+            .squeeze(0)
+            .map_err(&candle_err)?;
         embedding
             .to_vec1::<f32>()
             .map_err(|e| EmbedderError::Generation(e.to_string()))
