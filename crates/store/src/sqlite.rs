@@ -1168,18 +1168,19 @@ impl Storage for SqliteStore {
 
         // Import sessions first (FK dependency)
         for session in &data.sessions {
-            let result = conn.execute(
-                "INSERT OR IGNORE INTO sessions (id, project, started_at, ended_at, summary) \
+            let result = conn
+                .execute(
+                    "INSERT OR IGNORE INTO sessions (id, project, started_at, ended_at, summary) \
                  VALUES (?, ?, ?, ?, ?)",
-                rusqlite::params![
-                    session.id,
-                    session.project,
-                    session.started_at.to_rfc3339(),
-                    session.ended_at.map(|t| t.to_rfc3339()),
-                    session.summary,
-                ],
-            )
-            .map_err(|e| EngramError::Database(e.to_string()))?;
+                    rusqlite::params![
+                        session.id,
+                        session.project,
+                        session.started_at.to_rfc3339(),
+                        session.ended_at.map(|t| t.to_rfc3339()),
+                        session.summary,
+                    ],
+                )
+                .map_err(|e| EngramError::Database(e.to_string()))?;
             if result > 0 {
                 sessions_imported += 1;
             }
@@ -1231,17 +1232,18 @@ impl Storage for SqliteStore {
 
         // Import prompts
         for prompt in &data.prompts {
-            let result = conn.execute(
-                "INSERT OR IGNORE INTO prompts (session_id, project, content, created_at) \
+            let result = conn
+                .execute(
+                    "INSERT OR IGNORE INTO prompts (session_id, project, content, created_at) \
                  VALUES (?, ?, ?, ?)",
-                rusqlite::params![
-                    prompt.session_id,
-                    prompt.project,
-                    prompt.content,
-                    prompt.created_at.to_rfc3339(),
-                ],
-            )
-            .map_err(|e| EngramError::Database(e.to_string()))?;
+                    rusqlite::params![
+                        prompt.session_id,
+                        prompt.project,
+                        prompt.content,
+                        prompt.created_at.to_rfc3339(),
+                    ],
+                )
+                .map_err(|e| EngramError::Database(e.to_string()))?;
             if result > 0 {
                 prompts_imported += 1;
             }

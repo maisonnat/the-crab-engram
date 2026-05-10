@@ -11,8 +11,8 @@ use engram_store::{AddObservationParams, SearchOptions, Storage};
 
 use crate::{
     AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, ConsolidationResult, EvolutionResult,
-    GraphEvolver, HeuristicSynthesizer, MemoryStream, SmartInjector, infer_salience,
-    bootstrap_reviews,
+    GraphEvolver, HeuristicSynthesizer, MemoryStream, SmartInjector, bootstrap_reviews,
+    infer_salience,
 };
 use engram_search::FastembedEngine;
 

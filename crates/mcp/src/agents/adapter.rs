@@ -143,7 +143,10 @@ pub trait AgentAdapter: Send + Sync {
 /// Resolve the standard database path dynamically.
 pub fn get_db_path() -> String {
     if let Some(home) = dirs::home_dir() {
-        home.join(".engram").join("engram.db").to_string_lossy().to_string()
+        home.join(".engram")
+            .join("engram.db")
+            .to_string_lossy()
+            .to_string()
     } else {
         "~/.engram/engram.db".into()
     }
@@ -167,7 +170,8 @@ pub fn build_mcp_entry_yaml(profile: &str) -> String {
     args: ["--db", "{}", "mcp", "--profile", "{}"]
     timeout: 30
 "#,
-        get_db_path(), profile
+        get_db_path(),
+        profile
     )
 }
 

@@ -136,7 +136,7 @@ impl InferenceEngine {
         // let guard = self.model.lock().unwrap();
         // let loaded = guard.as_ref().ok_or_else(|| anyhow::anyhow!("model not loaded"))?;
         // loaded._context.generate(prompt, ...)
-        
+
         // Stub mode: return a placeholder
         if prompt.to_lowercase().contains("json") {
             Ok(r#"{"title": "Stub Extraction", "observations": [], "edges": []}"#.to_string())
