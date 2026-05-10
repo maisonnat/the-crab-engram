@@ -12,61 +12,12 @@ use tower_http::cors::CorsLayer;
 
 use engram_core::{ObservationType, RelationType, Scope};
 use engram_learn::{
-    AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, GraphEvolver, HeuristicSynthesizer,
-    MemoryStream, SmartInjector, infer_salience,
+    AntiPatternDetector, CapsuleBuilder, ConsolidationEngine, HeuristicSynthesizer, LearnDaemon,
+    LearnDaemonConfig, LearnDaemonStatus, LearnTickStatus, MemoryStream, SmartInjector,
 };
 use engram_store::{
     AddEdgeParams, AddObservationParams, SearchOptions, Storage, UpdateObservationParams,
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct LearnTickStatus {
-    pub entities_linked: usize,
-    pub capsules_upserted: usize,
-    pub reviews_upserted: usize,
-    pub anti_patterns_found: usize,
-    pub snapshots_written: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LearnDaemonStatus {
-    pub enabled: bool,
-    pub project: String,
-    pub interval_seconds: u64,
-    pub ticks_run: u64,
-    pub last_started_at: Option<String>,
-    pub last_completed_at: Option<String>,
-    pub last_error: Option<String>,
-    pub last_tick: Option<LearnTickStatus>,
-}
-
-impl LearnDaemonStatus {
-    pub fn disabled(project: String) -> Self {
-        Self {
-            enabled: false,
-            project,
-            interval_seconds: 0,
-            ticks_run: 0,
-            last_started_at: None,
-            last_completed_at: None,
-            last_error: None,
-            last_tick: None,
-        }
-    }
-
-    pub fn enabled(project: String, interval_seconds: u64) -> Self {
-        Self {
-            enabled: true,
-            project,
-            interval_seconds,
-            ticks_run: 0,
-            last_started_at: None,
-            last_completed_at: None,
-            last_error: None,
-            last_tick: None,
-        }
-    }
-}
 
 /// Shared application state.
 #[derive(Clone)]
@@ -190,124 +141,39 @@ async fn learn_run(State(state): State<AppState>) -> impl IntoResponse {
     let project = state.project.clone();
 
     let result = tokio::task::spawn_blocking(move || -> Result<LearnTickStatus, String> {
-        // 1. Ensure a session exists
-        let session_id = store
-            .clone()
-            .create_session(&project)
-            .map_err(|e| e.to_string())?;
-
-        // 2. Fetch recent observations
-        let observations = store
-            .search(&SearchOptions {
-                query: String::new(),
-                project: Some(project.clone()),
-                limit: Some(1000),
+        let daemon = LearnDaemon::new(
+            store,
+            LearnDaemonConfig {
+                project,
                 ..Default::default()
-            })
-            .map_err(|e| e.to_string())?;
+            },
+            None,
+            None,
+        );
 
-        let mut entities_linked = 0usize;
-
-        // 3. Observe phase — link entities
-        for obs in &observations {
-            let text = format!("{} {}", obs.title, obs.content);
-            let entities = MemoryStream::extract_entities(&text);
-            let _salience = infer_salience(&obs.content, None);
-
-            for entity in entities {
-                let entity_id = match store.get_entity(&entity.name).map_err(|e| e.to_string())? {
-                    Some((id, _, _, _)) => id,
-                    None => store
-                        .upsert_entity(&entity.name, &entity.entity_type, "")
-                        .map_err(|e| e.to_string())?,
-                };
-                store
-                    .link_entity_observation(entity_id, obs.id)
-                    .map_err(|e| e.to_string())?;
-                entities_linked += 1;
-            }
+        match daemon.run_once() {
+            Ok(result) => Ok(LearnTickStatus {
+                entities_linked: result.entities_linked,
+                capsules_upserted: result.capsules_upserted,
+                reviews_upserted: result.reviews_upserted,
+                anti_patterns_found: result.anti_patterns_found,
+                snapshots_written: result.snapshots_written,
+            }),
+            Err(e) => Err(e.to_string()),
         }
-
-        // 4. Consolidation
-        let consolidator = ConsolidationEngine::new(store.clone(), None);
-        let _consolidation = consolidator
-            .run_consolidation(&project)
-            .map_err(|e| e.to_string())?;
-
-        // 5. Evolution
-        let evolver = GraphEvolver::new(store.clone(), None);
-        let _evolution = evolver.evolve(&project).map_err(|e| e.to_string())?;
-
-        // 6. Capsules
-        let mut capsules_upserted = 0usize;
-        let mut topic_counts: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
-        for obs in &observations {
-            if let Some(topic) = obs.topic_key.as_ref().filter(|s| !s.is_empty()) {
-                *topic_counts.entry(topic.clone()).or_insert(0) += 1;
-            }
-        }
-        let mut topics: Vec<(String, usize)> = topic_counts.into_iter().collect();
-        topics.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
-        let builder = CapsuleBuilder::new(store.clone(), Box::new(HeuristicSynthesizer));
-
-        for (topic, _count) in topics.into_iter().filter(|(_, c)| *c >= 2).take(5) {
-            if let Ok(capsule) = builder.build_capsule(&project, &topic) {
-                store.upsert_capsule(&capsule).map_err(|e| e.to_string())?;
-                capsules_upserted += 1;
-            }
-        }
-
-        // 7. Anti-patterns
-        let detector = AntiPatternDetector::new(store.clone(), None);
-        let patterns = detector.detect_all(&project).map_err(|e| e.to_string())?;
-
-        for pattern in &patterns {
-            let topic = format!(
-                "learn/anti-pattern/{}",
-                pattern.r#type.to_string().to_lowercase().replace(' ', "-")
-            );
-            let content = format!(
-                "{}\n\nSeverity: {}\nSuggestion: {}\nEvidence: {:?}",
-                pattern.description, pattern.severity, pattern.suggestion, pattern.evidence
-            );
-            let _ = store.insert_observation(&AddObservationParams {
-                r#type: ObservationType::Learning,
-                scope: Scope::Project,
-                title: format!("Anti-pattern detected: {}", pattern.r#type),
-                content,
-                session_id: session_id.clone(),
-                project: project.clone(),
-                topic_key: Some(topic),
-                provenance_source: Some("inferred".into()),
-                provenance_evidence: pattern
-                    .evidence
-                    .iter()
-                    .map(|id| format!("observation:{id}"))
-                    .collect(),
-            });
-        }
-
-        Ok(LearnTickStatus {
-            entities_linked,
-            capsules_upserted,
-            reviews_upserted: 0,
-            anti_patterns_found: patterns.len(),
-            snapshots_written: 0,
-        })
     })
     .await;
 
     match result {
-        Ok(Ok(tick)) => (StatusCode::OK, Json(tick)).into_response(),
-        Ok(Err(err)) => (
+        Ok(Ok(status)) => Json(status).into_response(),
+        Ok(Err(e)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": err})),
+            Json(serde_json::json!({ "error": e })),
         )
             .into_response(),
-        Err(join_err) => (
+        Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("task panicked: {join_err}")})),
+            Json(serde_json::json!({ "error": format!("task panicked: {e}") })),
         )
             .into_response(),
     }

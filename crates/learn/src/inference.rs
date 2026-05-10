@@ -136,10 +136,16 @@ impl InferenceEngine {
         // let guard = self.model.lock().unwrap();
         // let loaded = guard.as_ref().ok_or_else(|| anyhow::anyhow!("model not loaded"))?;
         // loaded._context.generate(prompt, ...)
-        Ok(format!(
-            "[stub inference for: {}]",
-            &prompt[..prompt.len().min(50)]
-        ))
+        
+        // Stub mode: return a placeholder
+        if prompt.to_lowercase().contains("json") {
+            Ok(r#"{"title": "Stub Extraction", "observations": [], "edges": []}"#.to_string())
+        } else {
+            Ok(format!(
+                "[stub inference for: {}]",
+                &prompt[..prompt.len().min(50)]
+            ))
+        }
     }
 
     #[cfg(not(feature = "inference"))]
@@ -148,10 +154,15 @@ impl InferenceEngine {
             self.load()?;
         }
         // Stub mode: return a placeholder
-        Ok(format!(
-            "[stub inference for: {}]",
-            &prompt[..prompt.len().min(50)]
-        ))
+        // If prompt asks for JSON, return a valid dummy JSON to avoid pipeline crashes
+        if prompt.to_lowercase().contains("json") {
+            Ok(r#"{"title": "Stub Extraction", "observations": [], "edges": []}"#.to_string())
+        } else {
+            Ok(format!(
+                "[stub inference for: {}]",
+                &prompt[..prompt.len().min(50)]
+            ))
+        }
     }
 
     /// Cache a system prompt + schema prefix for reuse across inferences.

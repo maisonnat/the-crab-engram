@@ -1161,11 +1161,14 @@ impl Storage for SqliteStore {
         let conn = self.conn();
 
         let mut obs_imported = 0;
+        let mut sessions_imported = 0;
+        let mut prompts_imported = 0;
+        let mut edges_imported = 0;
         let mut obs_skipped = 0;
 
         // Import sessions first (FK dependency)
         for session in &data.sessions {
-            conn.execute(
+            let result = conn.execute(
                 "INSERT OR IGNORE INTO sessions (id, project, started_at, ended_at, summary) \
                  VALUES (?, ?, ?, ?, ?)",
                 rusqlite::params![
@@ -1177,6 +1180,9 @@ impl Storage for SqliteStore {
                 ],
             )
             .map_err(|e| EngramError::Database(e.to_string()))?;
+            if result > 0 {
+                sessions_imported += 1;
+            }
         }
 
         // Import observations
@@ -1185,10 +1191,10 @@ impl Storage for SqliteStore {
                 .execute(
                     "INSERT OR IGNORE INTO observations \
                  (id, type, scope, title, content, session_id, project, topic_key, \
-                  created_at, updated_at, access_count, last_accessed, pinned, normalized_hash, \
+                  created_at, updated_at, recorded_at, access_count, last_accessed, pinned, normalized_hash, \
                   provenance_source, provenance_confidence, provenance_evidence, lifecycle_state, \
                   emotional_valence, surprise_factor, effort_invested) \
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     rusqlite::params![
                         obs.id,
                         obs.r#type.to_string(),
@@ -1200,6 +1206,7 @@ impl Storage for SqliteStore {
                         obs.topic_key,
                         obs.created_at.to_rfc3339(),
                         obs.updated_at.to_rfc3339(),
+                        obs.recorded_at.to_rfc3339(),
                         obs.access_count,
                         obs.last_accessed.map(|t| t.to_rfc3339()),
                         if obs.pinned { 1 } else { 0 },
@@ -1224,7 +1231,7 @@ impl Storage for SqliteStore {
 
         // Import prompts
         for prompt in &data.prompts {
-            conn.execute(
+            let result = conn.execute(
                 "INSERT OR IGNORE INTO prompts (session_id, project, content, created_at) \
                  VALUES (?, ?, ?, ?)",
                 rusqlite::params![
@@ -1235,13 +1242,41 @@ impl Storage for SqliteStore {
                 ],
             )
             .map_err(|e| EngramError::Database(e.to_string()))?;
+            if result > 0 {
+                prompts_imported += 1;
+            }
+        }
+
+        // Import edges
+        for edge in &data.edges {
+            let result = conn.execute(
+                "INSERT OR IGNORE INTO edges \
+                 (id, source_id, target_id, relation, weight, valid_from, valid_until, recorded_at, superseded_by, auto_detected) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                rusqlite::params![
+                    edge.id,
+                    edge.source_id,
+                    edge.target_id,
+                    edge.relation.to_string(),
+                    edge.weight,
+                    edge.valid_from.to_rfc3339(),
+                    edge.valid_until.map(|t| t.to_rfc3339()),
+                    edge.recorded_at.to_rfc3339(),
+                    edge.superseded_by,
+                    if edge.auto_detected { 1 } else { 0 },
+                ],
+            )
+            .map_err(|e| EngramError::Database(e.to_string()))?;
+            if result > 0 {
+                edges_imported += 1;
+            }
         }
 
         Ok(ImportResult {
             observations_imported: obs_imported,
-            sessions_imported: data.sessions.len(),
-            prompts_imported: data.prompts.len(),
-            edges_imported: data.edges.len(),
+            sessions_imported,
+            prompts_imported,
+            edges_imported,
             duplicates_skipped: obs_skipped,
         })
     }

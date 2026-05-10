@@ -10,6 +10,7 @@ pub mod stream_engine;
 
 pub mod inference;
 
+pub mod daemon;
 pub mod extraction;
 
 pub use anti_pattern::{AntiPattern, AntiPatternDetector, AntiPatternType, Severity};
@@ -18,6 +19,10 @@ pub use capsule_builder::{
     CapsuleBuilder, CapsuleSynthesizer, ChainedSynthesizer, HeuristicSynthesizer,
 };
 pub use consolidation::{ConsolidationEngine, ConsolidationResult};
+pub use daemon::{
+    LearnDaemon, LearnDaemonConfig, LearnDaemonStatus, LearnTickResult, LearnTickStatus,
+    format_tick_summary,
+};
 pub use graph_evolver::{EvolutionResult, GraphEvolver, NewEdge};
 pub use salience_infer::infer_salience;
 pub use smart_injector::{InjectionContext, SmartInjector};

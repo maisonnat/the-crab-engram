@@ -140,14 +140,21 @@ pub trait AgentAdapter: Send + Sync {
 // Build helpers
 // ---------------------------------------------------------------------------
 
-const DEFAULT_DB_PATH: &str = "/home/maiso/.engram/engram.db";
+/// Resolve the standard database path dynamically.
+pub fn get_db_path() -> String {
+    if let Some(home) = dirs::home_dir() {
+        home.join(".engram").join("engram.db").to_string_lossy().to_string()
+    } else {
+        "~/.engram/engram.db".into()
+    }
+}
 
 /// Build the standard MCP server entry for the agents JSON format (mcpServers).
 pub fn build_mcp_entry_json(profile: &str) -> serde_json::Value {
     serde_json::json!({
         "engram": {
             "command": "the-crab-engram",
-            "args": ["--db", DEFAULT_DB_PATH, "mcp", "--profile", profile]
+            "args": ["--db", get_db_path(), "mcp", "--profile", profile]
         }
     })
 }
@@ -160,7 +167,7 @@ pub fn build_mcp_entry_yaml(profile: &str) -> String {
     args: ["--db", "{}", "mcp", "--profile", "{}"]
     timeout: 30
 "#,
-        DEFAULT_DB_PATH, profile
+        get_db_path(), profile
     )
 }
 

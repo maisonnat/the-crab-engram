@@ -168,6 +168,20 @@ impl ProvenanceSource {
     }
 }
 
+impl std::fmt::Display for ProvenanceSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::TestVerified => "test_verified",
+            Self::CodeAnalysis => "code_analysis",
+            Self::UserStated => "user_stated",
+            Self::External => "external",
+            Self::LlmReasoning => "llm_reasoning",
+            Self::Inferred => "inferred",
+        };
+        write!(f, "{s}")
+    }
+}
+
 impl std::str::FromStr for ProvenanceSource {
     type Err = crate::EngramError;
 
