@@ -833,9 +833,11 @@ impl Storage for SqliteStore {
             .map_err(|e| EngramError::Database(e.to_string()))?;
 
         let edges: usize = conn
-            .query_row("SELECT COUNT(*) FROM edges", [], |row| {
-                row.get::<_, i64>(0).map(|v| v as usize)
-            })
+            .query_row(
+                "SELECT COUNT(e.source_id) FROM edges e JOIN observations o ON e.source_id = o.id WHERE o.project = ?",
+                [project],
+                |row| row.get::<_, i64>(0).map(|v| v as usize),
+            )
             .unwrap_or(0);
 
         let capsules: usize = conn
